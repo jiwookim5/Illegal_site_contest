@@ -46,3 +46,12 @@ freescout.html
 
 # 크롬 드라이버
 chromedriver
+
+# 오래된 크롤러 파일
+illegal_ad_crawler.py
+illegal_ad_crawler_v2.py
+illegal_ad_detector.py
+test_suspicious_page.html
+
+# 프로젝트 설정
+CLAUDE.md
