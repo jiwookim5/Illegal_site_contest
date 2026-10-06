@@ -1,0 +1,48 @@
+# 시스템 파일
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 데이터 파일
+*.csv
+*.json
+detection_results.json
+
+# 이전 분석 파일들
+1.FreeScout/
+2.MediaCMS/
+3.Documenso/
+4.Formbricks/
+5.Coolify/
+6.Linkwarden/
+7.Baserow/
+analysis/
+findings/
+pylti_check/
+
+# 보고서 초안
+REPORT_DRAFT.md
+real_report.md
+real_targets.md
+freescout.html
+
+# 크롬 드라이버
+chromedriver

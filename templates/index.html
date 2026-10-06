@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP 불법광고 탐지 - Illegal Ad Detector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .input-section {
+            display: grid;
+            grid-template-columns: 1fr 100px;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        input[type="number"] {
+            width: 80px;
+            padding: 12px 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-card.success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+
+        .result-card.danger {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .result-card.warning {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+
+        .result-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .result-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .result-content p {
+            margin-bottom: 8px;
+        }
+
+        .detection-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 5px 5px 5px 0;
+        }
+
+        .detection-badge.danger {
+            background: #f44336;
+        }
+
+        .detection-badge.success {
+            background: #4caf50;
+        }
+
+        .text-sample {
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #555;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        .context-box {
+            background: #fffacd;
+            border-left: 4px solid #ff6b6b;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+            border: 1px solid #ffd700;
+        }
+
+        .context-box mark {
+            background: #FFD700 !important;
+            color: #000 !important;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-weight: bold;
+        }
+
+        .keywords-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .keywords-section h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .keyword-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .keyword-item {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .category-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .error {
+            color: #f44336;
+        }
+
+        .success {
+            color: #4caf50;
+        }
+
+        .info {
+            color: #667eea;
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .input-section {
+                grid-template-columns: 1fr;
+            }
+
+            .keyword-group {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 IP 불법광고 탐지</h1>
+            <p>IP 주소를 입력하면 웹 서버의 텍스트를 크롤링하여 불법광고를 탐지합니다</p>
+        </div>
+
+        <div class="content">
+            <!-- 입력 섹션 -->
+            <div class="input-section">
+                <div class="input-group">
+                    <input type="text" id="ipInput" placeholder="URL 입력 (예: example.com, 192.168.1.1, github.com:8080)" autocomplete="off" style="flex: 1;">
+                </div>
+                <button id="scanBtn" onclick="scanIP()" style="width: auto;">
+                    <span class="spinner" id="spinner"></span>
+                    <span id="btnText">스캔</span>
+                </button>
+            </div>
+
+            <!-- 결과 섹션 -->
+            <div class="result" id="resultContainer">
+                <div id="resultCard"></div>
+            </div>
+
+            <!-- 탐지 키워드 섹션 -->
+            <div class="keywords-section">
+                <h3>📋 탐지 키워드</h3>
+                <div id="keywordsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isScanning = false;
+
+        // 키워드 로드
+        function loadKeywords() {
+            fetch('/api/keywords')
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('keywordsContainer');
+                    container.innerHTML = '';
+
+                    for (const [category, keywords] of Object.entries(data)) {
+                        const group = document.createElement('div');
+                        group.className = 'keyword-group';
+
+                        let html = `<div style="grid-column: 1/-1;"><div class="category-label">${category}</div></div>`;
+                        keywords.forEach(kw => {
+                            html += `<div class="keyword-item">${kw}</div>`;
+                        });
+
+                        group.innerHTML = html;
+                        container.appendChild(group);
+                    }
+                })
+                .catch(err => console.error('키워드 로드 실패:', err));
+        }
+
+        // URL 스캔
+        async function scanIP() {
+            const url = document.getElementById('ipInput').value.trim();
+            const scanBtn = document.getElementById('scanBtn');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+
+            if (!url) {
+                alert('URL을 입력해주세요');
+                return;
+            }
+
+            if (isScanning) return;
+
+            isScanning = true;
+            scanBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = '스캔 중...';
+
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ip: url })
+                });
+
+                const data = await response.json();
+
+                const resultContainer = document.getElementById('resultContainer');
+                const resultCard = document.getElementById('resultCard');
+
+                if (data.success) {
+                    const detection = data.detection;
+                    let cardClass = detection.detected ? 'danger' : 'success';
+                    let icon = detection.detected ? '🚨' : '✅';
+
+                    resultCard.innerHTML = `
+                        <div class="result-card ${cardClass}">
+                            <div class="result-title">${icon} ${detection.message}</div>
+                            <div class="result-content">
+                                <p><strong>URL:</strong> ${data.url}</p>
+                                <p><strong>도메인 신뢰도:</strong> <span style="color: ${data.domain_trust >= 70 ? '#4caf50' : data.domain_trust >= 50 ? '#ff9800' : '#f44336'}; font-weight: bold;">${data.domain_trust}%</span>
+                                ${data.low_trust_warning ? '<span style="color: #ff9800; margin-left: 10px;">⚠️ 낮은 신뢰도 도메인</span>' : ''}
+                                </p>
+                                <p><strong>수집 텍스트:</strong> ${data.text_length}글자</p>
+                                ${detection.detected ? `
+                                    <p><strong>카테고리:</strong> <span class="detection-badge ${detection.category === '의심' ? '' : 'danger'}">${detection.category}</span></p>
+                                    <p><strong>탐지 키워드:</strong> <span class="detection-badge danger">${detection.keyword}</span></p>
+                                    <p><strong>탐지 방식:</strong> <span style="color: #ff6b6b; font-weight: bold;">${detection.detection_type || '키워드'}</span></p>
+                                    <p><strong>신뢰도:</strong> <span style="color: #667eea; font-weight: bold; font-size: 18px;">${detection.confidence}%</span></p>
+                                    ${detection.behavioral_signals ? `
+                                        <p><strong>행동 신호:</strong></p>
+                                        <ul style="font-size: 13px; margin: 5px 0;">
+                                            ${detection.behavioral_signals['긴급성'] > 0 ? `<li>긴급성 표현: ${detection.behavioral_signals['긴급성']}회</li>` : ''}
+                                            ${detection.behavioral_signals['CTA'] > 0 ? `<li>CTA 표현: ${detection.behavioral_signals['CTA']}회</li>` : ''}
+                                            ${detection.behavioral_signals['거래신호'] > 0 ? `<li>거래 신호: ${detection.behavioral_signals['거래신호']}회</li>` : ''}
+                                            ${detection.behavioral_signals['전화번호'] ? `<li>전화번호 포함</li>` : ''}
+                                            ${detection.behavioral_signals['카톡ID'] ? `<li>카톡 ID 포함</li>` : ''}
+                                        </ul>
+                                    ` : ''}
+                                    <p><strong>탐지된 내용:</strong></p>
+                                    <div class="context-box">
+                                        ${detection.context}
+                                    </div>
+                                ` : ''}
+                                ${data.linked_illegal_sites && data.linked_illegal_sites.length > 0 ? `
+                                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                        <p><strong>🚨 불법광고 사이트 링크 (${data.linked_illegal_sites_count}개)</strong></p>
+                                        <div style="margin-top: 10px;">
+                                            ${data.linked_illegal_sites.map(link => `
+                                                <div style="background: #ffcccc; border-left: 4px solid #f44336; padding: 10px; margin-bottom: 10px; border-radius: 4px;">
+                                                    <p><strong>링크 텍스트:</strong> ${link.text}</p>
+                                                    <p><strong>링크 도메인:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${link.domain}</code></p>
+                                                    <p><strong>최종 목적지:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${link.destination}</code></p>
+                                                    ${link.suspicious_redirect ? `<p><strong style="color: #ff6b6b;">⚠️ 의심스러운 리다이렉트:</strong> 다른 도메인으로 리다이렉트됨</p>` : ''}
+                                                    <p><strong>탐지 카테고리:</strong> <span style="color: #f44336; font-weight: bold;">${link.category}</span> (${link.keyword})</p>
+                                                    <p><strong>신뢰도:</strong> ${link.confidence}%</p>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                ${data.risky_links && data.risky_links.length > 0 && (!data.linked_illegal_sites || data.linked_illegal_sites.length === 0) ? `
+                                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                        <p><strong>🔗 의심 광고 링크 (${data.risky_links_count}개)</strong></p>
+                                        <div style="margin-top: 10px;">
+                                            ${data.risky_links.map(link => `
+                                                <div style="background: #fff8dc; border-left: 4px solid #ff9800; padding: 10px; margin-bottom: 10px; border-radius: 4px;">
+                                                    <p><strong>링크 텍스트:</strong> ${link.text}</p>
+                                                    <p><strong>도메인:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${link.domain}</code></p>
+                                                    <p><strong>위험도:</strong> <span style="color: #ff9800; font-weight: bold; font-size: 16px;">${link.risk_score}점</span> / 신뢰도: ${link.trust_score}%</p>
+                                                    ${link.reasons && link.reasons.length > 0 ? `
+                                                        <p><strong>위험 신호:</strong> ${link.reasons.join(', ')}</p>
+                                                    ` : ''}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                <div class="text-sample">
+                                    <strong>텍스트 샘플:</strong><br>
+                                    ${data.text_sample}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultCard.innerHTML = `
+                        <div class="result-card warning">
+                            <div class="result-title">⚠️ 스캔 실패</div>
+                            <div class="result-content">
+                                <p class="error">${data.error}</p>
+                                <p class="info">대상: ${data.url}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                resultContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('오류:', error);
+                const resultCard = document.getElementById('resultCard');
+                resultCard.innerHTML = `
+                    <div class="result-card warning">
+                        <div class="result-title">❌ 요청 오류</div>
+                        <div class="result-content">
+                            <p class="error">${error.message}</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('resultContainer').style.display = 'block';
+            } finally {
+                isScanning = false;
+                scanBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = '스캔';
+            }
+        }
+
+        // 엔터 키 지원
+        document.getElementById('ipInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') scanIP();
+        });
+
+        // 페이지 로드 시 키워드 로드
+        window.addEventListener('load', loadKeywords);
+    </script>
+</body>
+</html>
