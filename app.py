@@ -18,8 +18,136 @@ from datetime import datetime
 import re
 import socket
 import time
+import json
+import os
 
 app = Flask(__name__)
+
+# 스캔 기록 저장 파일
+HISTORY_FILE = 'scan_history.json'
+LOG_FILE = 'scan_log.csv'
+
+def _build_detection_sources(detection_result, additional_info):
+    """탐지 소스 정보 구성"""
+    sources = []
+
+    # 메인 페이지에서 탐지
+    if detection_result.get('detection_type') == '키워드 (점수: 80)' or \
+       (detection_result.get('detected') and detection_result.get('detection_type') and '메타데이터' not in detection_result.get('detection_type')):
+        sources.append(f"메인페이지({detection_result.get('keyword')}-{detection_result.get('confidence')}%)")
+
+    # 하위 페이지에서 탐지
+    if additional_info:
+        internal_pages = additional_info.get('internal_illegal_pages', [])
+        for page in internal_pages:
+            page_url = page.get('url', '').split('/')[-1] or page.get('url', '')
+            sources.append(f"하위페이지:{page_url}({page.get('keyword')}-{page.get('confidence')}%)")
+
+        # 불법광고 링크에서 탐지
+        linked_sites = additional_info.get('linked_illegal_sites', [])
+        for site in linked_sites:
+            from urllib.parse import urlparse
+            domain = urlparse(site.get('destination', '')).netloc
+            sources.append(f"광고링크:{domain}({site.get('keyword')}-{site.get('confidence')}%)")
+
+    return ' | '.join(sources) if sources else '-'
+
+def save_scan_history(url, detection_result, additional_info=None):
+    """스캔 기록 저장 (JSON + CSV)"""
+    try:
+        # === JSON 기록 (UI용) ===
+        # 기존 기록 로드
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+
+        # 탐지 소스 구성
+        detection_sources = _build_detection_sources(detection_result, additional_info)
+
+        # 새 기록 추가
+        record = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'url': url,
+            'detected': detection_result.get('detected', False),
+            'category': detection_result.get('category'),
+            'confidence': detection_result.get('confidence', 0),
+            'keyword': detection_result.get('keyword'),
+            'message': detection_result.get('message'),
+            'detection_sources': detection_sources
+        }
+
+        history.append(record)
+
+        # 최근 100개만 유지
+        if len(history) > 100:
+            history = history[-100:]
+
+        # JSON 저장
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+
+        # === CSV 로그 (상세 기록용) ===
+        import csv
+
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        detected_str = 'YES' if detection_result.get('detected') else 'NO'
+        category = detection_result.get('category') or '-'
+        keyword = detection_result.get('keyword') or '-'
+        confidence = detection_result.get('confidence', 0)
+        domain_trust = additional_info.get('domain_trust', 0) if additional_info else 0
+        internal_pages = len(additional_info.get('internal_illegal_pages', [])) if additional_info else 0
+        risky_links = len(additional_info.get('risky_links', [])) if additional_info else 0
+        linked_sites = len(additional_info.get('linked_illegal_sites', [])) if additional_info else 0
+
+        # CSV 헤더 (첫 실행 시)
+        file_exists = os.path.exists(LOG_FILE)
+
+        with open(LOG_FILE, 'a', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+
+            if not file_exists:
+                writer.writerow([
+                    '시간',
+                    'URL',
+                    '탐지',
+                    '카테고리',
+                    '키워드',
+                    '신뢰도(%)',
+                    '도메인신뢰도(%)',
+                    '하위페이지',
+                    '의심링크',
+                    '불법광고링크',
+                    '탐지위치'
+                ])
+
+            writer.writerow([
+                timestamp,
+                url,
+                detected_str,
+                category,
+                keyword,
+                confidence,
+                domain_trust,
+                internal_pages,
+                risky_links,
+                linked_sites,
+                detection_sources
+            ])
+
+    except Exception as e:
+        print(f"기록 저장 오류: {e}")
+
+def load_scan_history():
+    """스캔 기록 로드"""
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"기록 로드 오류: {e}")
+
+    return []
 app.config['JSON_AS_ASCII'] = False
 
 # 불법광고 탐지 키워드 (카테고리별, 스코어 기반)
@@ -324,6 +452,70 @@ def track_redirects(url, timeout=5):
         return redirect_chain
     except Exception as e:
         return []
+
+def crawl_internal_links(start_url, domain, max_depth=2, timeout=30):
+    """같은 도메인 내부 링크 자동 크롤링"""
+    from urllib.parse import urljoin, urlparse
+
+    internal_pages = []
+    visited_urls = set()
+
+    def _crawl(url, depth):
+        """재귀적 크롤링"""
+        if depth > max_depth or url in visited_urls:
+            return
+
+        visited_urls.add(url)
+
+        try:
+            # 페이지 크롤링
+            crawl_result, error = crawl_with_selenium(url, timeout=5)
+
+            if error:
+                return
+
+            html = crawl_result['html']
+            text = crawl_result['text']
+
+            # 불법광고 탐지
+            detection = detect_illegal_ads(text)
+
+            # 탐지되면 기록
+            if detection['detected']:
+                internal_pages.append({
+                    'url': url,
+                    'depth': depth,
+                    'category': detection.get('category'),
+                    'keyword': detection.get('keyword'),
+                    'confidence': detection.get('confidence', 0)
+                })
+
+            # 같은 도메인의 내부 링크 추출
+            soup = BeautifulSoup(html, 'html.parser')
+            for link in soup.find_all('a', href=True):
+                href = link.get('href', '').strip()
+
+                if not href or href.startswith('#') or href.startswith('javascript:'):
+                    continue
+
+                # 절대 URL로 변환
+                try:
+                    abs_url = urljoin(url, href)
+                    link_domain = urlparse(abs_url).netloc
+
+                    # 같은 도메인만 크롤링
+                    if link_domain == domain and abs_url not in visited_urls:
+                        _crawl(abs_url, depth + 1)
+                except:
+                    continue
+
+        except Exception as e:
+            pass
+
+    # 시작 URL부터 크롤링
+    _crawl(start_url, depth=0)
+
+    return internal_pages
 
 def analyze_link_destination(link_url, timeout=5):
     """링크 목적지 크롤링 및 불법광고 탐지"""
@@ -939,6 +1131,34 @@ def scan_ip():
                 detection = metadata_detection
                 detection['detection_type'] = '메타데이터에서 탐지'
 
+    # 하위 페이지 크롤링 (학술/뉴스 포털 제외)
+    internal_illegal_pages = []
+    if not is_academic and not is_news:
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(crawl_url).netloc
+            internal_pages = crawl_internal_links(crawl_url, domain, max_depth=2, timeout=30)
+
+            for page in internal_pages:
+                internal_illegal_pages.append({
+                    'url': page['url'],
+                    'depth': page['depth'],
+                    'category': page['category'],
+                    'keyword': page['keyword'],
+                    'confidence': page['confidence']
+                })
+
+            # 하위 페이지에서 불법광고 발견 시 탐지 강도 높임
+            if internal_illegal_pages and not detection['detected']:
+                detection['detected'] = True
+                detection['category'] = internal_illegal_pages[0]['category']
+                detection['keyword'] = f"하위 페이지에서 {internal_illegal_pages[0]['keyword']} 탐지"
+                detection['detection_type'] = '하위 페이지 크롤링'
+                detection['confidence'] = min(internal_illegal_pages[0]['confidence'], 90)
+                detection['message'] = f"🚨 하위 페이지에서 불법광고 탐지 ({len(internal_illegal_pages)}개)"
+        except Exception as e:
+            pass
+
     # 광고 링크 분석 (학술/뉴스 포털 제외)
     risky_links = []
     linked_illegal_sites = []  # 목적지가 불법광고인 링크
@@ -1014,6 +1234,15 @@ def scan_ip():
     # 도메인 신뢰도가 낮으면 경고 추가
     low_trust = domain_trust < 50
 
+    # 스캔 기록 저장 (상세 정보 포함)
+    additional_info = {
+        'domain_trust': domain_trust,
+        'internal_illegal_pages': internal_illegal_pages,
+        'risky_links': risky_links,
+        'linked_illegal_sites': linked_illegal_sites
+    }
+    save_scan_history(crawl_url, detection, additional_info)
+
     return jsonify({
         'success': True,
         'url': crawl_url,
@@ -1021,6 +1250,8 @@ def scan_ip():
         'domain_trust': domain_trust,
         'low_trust_warning': low_trust,
         'metadata': metadata,
+        'internal_illegal_pages': internal_illegal_pages,
+        'internal_illegal_pages_count': len(internal_illegal_pages),
         'risky_links': risky_links,
         'risky_links_count': len(risky_links),
         'linked_illegal_sites': linked_illegal_sites,
@@ -1034,6 +1265,286 @@ def scan_ip():
 def get_keywords():
     """탐지 키워드 조회"""
     return jsonify(KEYWORDS)
+
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    """스캔 기록 조회"""
+    history = load_scan_history()
+    # 최신순 정렬
+    history.reverse()
+    return jsonify({'success': True, 'history': history, 'count': len(history)})
+
+@app.route('/api/history/clear', methods=['POST'])
+def clear_history():
+    """스캔 기록 초기화"""
+    try:
+        if os.path.exists(HISTORY_FILE):
+            os.remove(HISTORY_FILE)
+        return jsonify({'success': True, 'message': '기록이 초기화되었습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/detailed-history')
+def detailed_history():
+    """상세 스캔 기록 HTML 페이지"""
+    try:
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+    except:
+        history = []
+
+    # HTML 생성
+    html_content = '''<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>상세 스캔 기록 - IP 불법광고 탐지</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+        .content { padding: 30px; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-value { font-size: 28px; font-weight: bold; color: #667eea; }
+        .stat-label { font-size: 12px; color: #666; margin-top: 5px; }
+        .record {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .record.detected { border-left: 4px solid #f44336; }
+        .record.safe { border-left: 4px solid #4caf50; }
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+        .record-url {
+            font-weight: bold;
+            font-size: 15px;
+            color: #333;
+            word-break: break-all;
+            margin-bottom: 5px;
+        }
+        .record-time {
+            font-size: 12px;
+            color: #999;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-badge.detected {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status-badge.safe {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .record-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .detail-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        .detail-label {
+            font-size: 11px;
+            color: #666;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+        }
+        .detection-sources-box {
+            background: #fff8e1;
+            border-left: 3px solid #ff9800;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 15px;
+            grid-column: 1 / -1;
+        }
+        .detection-sources-label {
+            font-size: 11px;
+            color: #e65100;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .detection-sources-text {
+            font-size: 12px;
+            color: #555;
+            font-family: 'Courier New', monospace;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        @media (max-width: 600px) {
+            .header { padding: 20px; }
+            .header h1 { font-size: 20px; }
+            .content { padding: 15px; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 상세 스캔 기록</h1>
+            <p>모든 스캔 결과의 상세 정보</p>
+        </div>
+
+        <div class="content">
+'''
+
+    if history:
+        # 통계 계산
+        detected_count = sum(1 for r in history if r.get('detected'))
+        safe_count = len(history) - detected_count
+
+        html_content += f'''
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value">{len(history)}</div>
+                    <div class="stat-label">총 스캔</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #f44336;">{detected_count}</div>
+                    <div class="stat-label">탐지됨</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #4caf50;">{safe_count}</div>
+                    <div class="stat-label">안전</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #ff9800;">{(detected_count/len(history)*100):.1f}%</div>
+                    <div class="stat-label">탐지율</div>
+                </div>
+            </div>
+'''
+
+        # 기록 출력
+        for i, record in enumerate(reversed(history), 1):
+            detected = record.get('detected', False)
+            category = record.get('category', '-')
+            keyword = record.get('keyword', '-')
+            confidence = record.get('confidence', 0)
+            message = record.get('message', '')
+            detection_sources = record.get('detection_sources', '-')
+
+            html_content += f'''
+            <div class="record {'detected' if detected else 'safe'}">
+                <div class="record-header">
+                    <div>
+                        <div class="record-url">{record['url']}</div>
+                        <div class="record-time">📅 {record['timestamp']}</div>
+                    </div>
+                    <span class="status-badge {'detected' if detected else 'safe'}">
+                        {'🚨 탐지됨' if detected else '✅ 안전'}
+                    </span>
+                </div>
+
+                <div class="record-details">
+                    <div class="detail-item">
+                        <div class="detail-label">상태</div>
+                        <div class="detail-value">{'탐지됨' if detected else '안전'}</div>
+                    </div>
+'''
+
+            if detected:
+                html_content += f'''
+                    <div class="detail-item">
+                        <div class="detail-label">카테고리</div>
+                        <div class="detail-value">{category}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">키워드</div>
+                        <div class="detail-value" style="color: #f44336; font-weight: bold;">{keyword}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">신뢰도</div>
+                        <div class="detail-value" style="color: #667eea; font-weight: bold;">{confidence}%</div>
+                    </div>
+                    <div class="detection-sources-box">
+                        <div class="detection-sources-label">📍 탐지위치:</div>
+                        <div class="detection-sources-text">{detection_sources}</div>
+                    </div>
+                    <div style="grid-column: 1 / -1; background: white; padding: 10px; border-radius: 4px; border: 1px solid #e0e0e0;">
+                        <div class="detail-label">메시지</div>
+                        <div class="detail-value">{message}</div>
+                    </div>
+'''
+
+            html_content += '''
+                </div>
+            </div>
+'''
+    else:
+        html_content += '''
+            <div class="empty-message">
+                <p>아직 스캔 기록이 없습니다.</p>
+            </div>
+'''
+
+    html_content += '''
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+    return html_content
 
 if __name__ == '__main__':
     port = 8000

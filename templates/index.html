@@ -322,10 +322,28 @@
                 <div id="resultCard"></div>
             </div>
 
+            <!-- 탭 네비게이션 -->
+            <div style="margin-top: 30px; border-bottom: 2px solid #e0e0e0; display: flex; gap: 20px;">
+                <button id="tab-keywords" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid #667eea; color: #667eea; font-weight: bold; cursor: pointer;">키워드</button>
+                <button id="tab-history" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid transparent; color: #999; font-weight: bold; cursor: pointer;">기록</button>
+            </div>
+
             <!-- 탐지 키워드 섹션 -->
-            <div class="keywords-section">
-                <h3>📋 탐지 키워드</h3>
+            <div class="keywords-section" id="keywords-panel">
+                <h3>탐지 키워드</h3>
                 <div id="keywordsContainer"></div>
+            </div>
+
+            <!-- 스캔 기록 섹션 -->
+            <div id="history-panel" style="display: none; margin-top: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>스캔 기록 (<span id="history-count">0</span>개)</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="detailed-history" style="background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">📋 자세히 보기</button>
+                        <button id="clear-history" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">🗑️ 초기화</button>
+                    </div>
+                </div>
+                <div id="historyContainer" style="margin-top: 15px;"></div>
             </div>
         </div>
     </div>
@@ -424,6 +442,20 @@
                                         ${detection.context}
                                     </div>
                                 ` : ''}
+                                ${data.internal_illegal_pages && data.internal_illegal_pages.length > 0 ? `
+                                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                        <p><strong>🔍 하위 페이지 불법광고 (${data.internal_illegal_pages_count}개)</strong></p>
+                                        <div style="margin-top: 10px;">
+                                            ${data.internal_illegal_pages.map(page => `
+                                                <div style="background: #ffe8e8; border-left: 4px solid #d32f2f; padding: 10px; margin-bottom: 10px; border-radius: 4px;">
+                                                    <p><strong>페이지 URL:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${page.url}</code></p>
+                                                    <p><strong>깊이:</strong> ${page.depth} | <strong>카테고리:</strong> <span style="color: #d32f2f; font-weight: bold;">${page.category}</span></p>
+                                                    <p><strong>탐지 키워드:</strong> ${page.keyword} | <strong>신뢰도:</strong> ${page.confidence}%</p>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
                                 ${data.linked_illegal_sites && data.linked_illegal_sites.length > 0 ? `
                                     <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
                                         <p><strong>🚨 불법광고 사이트 링크 (${data.linked_illegal_sites_count}개)</strong></p>
@@ -504,8 +536,95 @@
             if (e.key === 'Enter') scanIP();
         });
 
-        // 페이지 로드 시 키워드 로드
-        window.addEventListener('load', loadKeywords);
+        // 기록 로드
+        function loadHistory() {
+            fetch('/api/history')
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('historyContainer');
+                    const count = document.getElementById('history-count');
+
+                    count.textContent = data.count;
+
+                    if (data.history.length === 0) {
+                        container.innerHTML = '<p style="color: #999; text-align: center;">아직 스캔 기록이 없습니다.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = data.history.map(record => `
+                        <div style="background: #f9f9f9; border: 1px solid #e0e0e0; padding: 12px; margin-bottom: 10px; border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <p style="margin: 0 0 8px 0; font-weight: bold; word-break: break-all;">${record.url}</p>
+                                    <p style="margin: 0; font-size: 12px; color: #666;">${record.timestamp}</p>
+                                    ${record.detection_sources && record.detected ? `
+                                        <div style="margin-top: 8px; background: #fff8e1; border-left: 3px solid #ff9800; padding: 8px; border-radius: 3px;">
+                                            <p style="margin: 0 0 4px 0; font-size: 11px; color: #e65100; font-weight: bold;">📍 탐지위치:</p>
+                                            <p style="margin: 0; font-size: 11px; color: #555; font-family: 'Courier New', monospace; word-break: break-word; line-height: 1.4;">${record.detection_sources}</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div style="text-align: right; margin-left: 10px;">
+                                    ${record.detected ? `
+                                        <span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block;">탐지됨</span>
+                                        <p style="margin: 5px 0 0 0; font-size: 12px;">카테고리: ${record.category}</p>
+                                        <p style="margin: 3px 0 0 0; font-size: 12px;">신뢰도: ${record.confidence}%</p>
+                                        ${record.keyword ? `<p style="margin: 3px 0 0 0; font-size: 12px;">키워드: ${record.keyword}</p>` : ''}
+                                    ` : `
+                                        <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block;">안전</span>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => console.error('기록 로드 실패:', err));
+        }
+
+        // 탭 전환
+        document.getElementById('tab-keywords').addEventListener('click', function() {
+            document.getElementById('keywords-panel').style.display = 'block';
+            document.getElementById('history-panel').style.display = 'none';
+            this.style.borderBottomColor = '#667eea';
+            this.style.color = '#667eea';
+            document.getElementById('tab-history').style.borderBottomColor = 'transparent';
+            document.getElementById('tab-history').style.color = '#999';
+        });
+
+        document.getElementById('tab-history').addEventListener('click', function() {
+            document.getElementById('keywords-panel').style.display = 'none';
+            document.getElementById('history-panel').style.display = 'block';
+            this.style.borderBottomColor = '#667eea';
+            this.style.color = '#667eea';
+            document.getElementById('tab-keywords').style.borderBottomColor = 'transparent';
+            document.getElementById('tab-keywords').style.color = '#999';
+            loadHistory();
+        });
+
+        // 상세 기록 보기
+        document.getElementById('detailed-history').addEventListener('click', function() {
+            window.open('/detailed-history', '_blank', 'width=1200,height=800');
+        });
+
+        // 기록 초기화
+        document.getElementById('clear-history').addEventListener('click', function() {
+            if (confirm('정말 모든 기록을 초기화하시겠습니까?')) {
+                fetch('/api/history/clear', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('기록이 초기화되었습니다.');
+                            loadHistory();
+                        }
+                    });
+            }
+        });
+
+        // 페이지 로드 시 키워드와 기록 로드
+        window.addEventListener('load', () => {
+            loadKeywords();
+            loadHistory();
+        });
     </script>
 </body>
 </html>
