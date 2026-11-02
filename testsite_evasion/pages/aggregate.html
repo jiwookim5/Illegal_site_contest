@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>같은 요소 집계 사례</title>
+<style>
+body{margin:0;background:#fff;color:#222;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:15px;line-height:1.6}
+.top{background:#1a3c6e;color:#fff;padding:10px 20px;font-weight:bold}
+.wrap{max-width:900px;margin:20px auto;padding:0 16px}
+h2{border-bottom:2px solid #1a3c6e;padding-bottom:8px}
+.case{border:1px solid #d9e2ec;border-radius:4px;padding:10px 14px;margin:10px 0;position:relative}
+.case h3{margin:0 0 6px;font-size:13px;color:#64748b;font-weight:normal}
+.layer-before::before{content:'';position:absolute;inset:0;background:#fff}
+ul.menu{list-style:none;padding:0}
+ul.menu li{padding:6px 0;border-bottom:1px dashed #e2e8f0}
+</style>
+</head>
+<body>
+<div class="top">훤히시 열린행정</div>
+<div class="wrap">
+<h2>같은 요소 집계 사례</h2>
+<div class="case"><h3>숨긴 상자 하나, 줄바꿈으로 나눈 광고 문구 세 개 (자식 요소 없음)</h3>
+<div class="ag-01" style="position:absolute;left:-9999px">안전놀이터 먹튀검증 첫충 30%<br>카지노 슬롯 가입머니 지급<br>텔레그램 @ev_ag01</div></div>
+<div class="case"><h3>숨긴 상자 하나, 광고 문구 span 세 개</h3>
+<div class="ag-02" style="display:none"><span>안전놀이터 먹튀검증 첫충 30%</span><span>카지노 슬롯 가입머니 지급</span><span>텔레그램 @ev_ag02</span></div></div>
+<div class="case"><h3>보이는 문단 안에 따로 투명하게 만든 span 두 개</h3>
+<p class="ag-03">민원 처리 기간은 7일입니다. <span style="color:transparent">안전놀이터 먹튀검증 첫충 30% 텔레그램 @ev_ag03a</span> 문의는 민원실로 해 주세요. <span style="color:transparent">카지노 슬롯 가입머니 지급 텔레그램 @ev_ag03b</span></p></div>
+<div class="case"><h3>숨긴 span 하나에 자모 분해 문자열 두 개</h3>
+<span class="ag-04" style="position:absolute;left:-9999px">ㅋㅏㅈㅣㄴㅗ 가입머니 지급, ㅌㅗㅌㅗ 첫충 30% 텔레그램 @ev_ag04</span></div>
+</div>
+</body>
+</html>

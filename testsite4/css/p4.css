@@ -1,0 +1,13 @@
+body{background:#fff;color:#222;font-family:sans-serif}
+.skip{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.ico::before{content:"카지노 첫충 보너스 지급";font-size:0px}
+.req::before{content:"필수 ";color:#c00}
+.tag::after{content:"ＴＯＴＯ 추천 코드"}
+.cover-wrap{position:relative;width:300px;height:40px}
+.under{position:absolute;left:0;top:0}
+.cover{position:absolute;left:0;top:0;width:300px;height:40px;background:#fff;z-index:10}
+.whitebox{background:#ffffff;padding:4px}
+.whitetext{color:#ffffff}
+.stickwrap{position:relative;width:260px;height:24px}
+.beneath{position:absolute;left:0;top:0}
+.sticky{position:absolute;left:0;top:0;width:260px;height:24px;background:#eee;z-index:5}

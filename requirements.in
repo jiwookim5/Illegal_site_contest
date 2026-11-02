@@ -1,0 +1,6 @@
+# 기본 탐지·첨부파일 검사. OCR 및 EXE 빌드 의존성은 docs/빌드_매뉴얼.md 참고.
+playwright==1.63.0
+pypdf==6.19.0
+olefile==0.47
+pypdfium2==5.6.0
+fonttools[woff]==4.66.1

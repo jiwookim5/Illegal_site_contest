@@ -1,0 +1,2497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>훤히 — 공공 누리집 숨은 불법광고 점검 도구</title>
+<style>
+/* C안. 범정부 UI/UX 디자인 시스템(KRDS) 1.1 의 값과 컴포넌트 규칙을 따른다.
+   단계 표시 → 입력 양식 → 요약 표 → 검색 조건 → 목록 표 → 상세 쪽.
+   색: 주 단추·선택·초점은 KRDS 주조색(파랑), 빨강은 훤히 로고와 위험 표시(불법광고·미확인)에만 쓴다.
+   크기: 단추 40/48/56px, 입력칸 48/56px, 체크박스·라디오 24px, 글자 13/15/17px 단계. */
+@font-face{font-family:"Pretendard";src:url("/fonts/PretendardVariable.woff2") format("woff2");
+  font-weight:45 920;font-style:normal;font-display:swap}
+:root{
+  --ink:#1e2124; --ink-2:#464c53; --ink-3:#5f6870;
+  --line:#b1b8be; --line-2:#d6dade; --gray:#f4f5f6; --gray-2:#e9ecef;
+  --red:#d7141e; --red-dark:#a80f16; --red-50:#fdf0f0;
+  --primary:#256ef4; --primary-60:#0b50d0; --primary-5:#ecf2fe;
+  --ok:#16703d; --focus:#1e2124;
+  --mono:Consolas,"D2Coding","Cascadia Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:#fff;color:var(--ink);font:17px/1.6 "Pretendard","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  word-break:keep-all;overflow-wrap:anywhere;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+/* KRDS 초점: 흰 테두리 + 주조색 고리 */
+:focus-visible{outline:2px solid #fff;outline-offset:0;box-shadow:0 0 0 4px var(--primary)}
+[hidden]{display:none !important}
+summary{cursor:pointer}
+a.btn{text-decoration:none;color:inherit}
+a.btn.primary{color:#fff}
+a.btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+code{font-family:var(--mono);font-size:15px;background:var(--gray);border:1px solid var(--line-2);border-radius:2px;padding:0 5px}
+
+#search-assist{margin:16px 0 24px;overflow:visible;min-height:0;border:1px solid var(--line-2);padding:10px 16px}
+#search-assist p{margin:10px 0;font-size:15px;color:var(--ink-3)}
+.searchnav{display:flex;align-items:center;gap:8px;padding-bottom:14px;border-bottom:1px solid var(--line-2);margin-bottom:22px}
+
+/* ── 점검 키워드 관리: 머리의 [점검 키워드]로 들어가는 화면. 단계 표시 자리에 돌아가기 줄이 온다 ── */
+.pagebar{display:flex;align-items:center;gap:14px;max-width:1440px;margin:0 auto;padding:8px 24px;font-size:15px;color:var(--ink-2)}
+.util button[aria-current="page"]{color:var(--ink);font-weight:800;text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:2px}
+.wrap.wide{max-width:1440px}
+#kwstage{--warn:#f08c00;--hl:#fff3bf;--ok-5:#eaf6ee}
+#kwstage h1{margin-bottom:12px}
+#kwstage .howto{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:0 0 10px;padding:0;list-style:none;counter-reset:h}
+#kwstage .howto li{position:relative;padding:12px 14px 12px 52px;background:var(--gray);border-radius:6px;font-size:15px;color:var(--ink-2)}
+#kwstage .howto li::before{counter-increment:h;content:counter(h);position:absolute;left:14px;top:13px;width:26px;height:26px;border-radius:50%;
+  background:var(--ink);color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center}
+#kwstage .howto b{display:block;color:var(--ink);font-size:16px}
+#kwstage .applied{margin:0 0 18px;font-size:14px;color:var(--ink-3)}
+#kwstage .applied b{color:var(--ink)}
+#kwstage .alert{margin-bottom:16px}
+/* 2단 배치: 창이 좁으면 시험해 보기가 목록 아래로 내려간다 */
+.kwlayout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:24px;align-items:start}
+@media (max-width:1000px){.kwlayout{grid-template-columns:minmax(0,1fr)}}
+/* 단어 추가 줄 (목록을 내려도 위에 붙어 있다) */
+.kwtool{position:sticky;top:0;z-index:5;background:#fff;padding:12px 0;border-bottom:1px solid var(--line-2);margin-bottom:14px}
+.kwaddrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.kwaddrow select,.kwaddrow input{height:44px;border:1px solid var(--ink-3);border-radius:4px;padding:0 12px;background:#fff;font-size:16px;min-width:0}
+.kwaddrow #kwword{flex:1 1 200px}
+.kwaddrow #kwfind{flex:0 1 220px}
+.kwaddrow .gap{flex:0 0 1px;align-self:stretch;background:var(--line-2);margin:0 4px}
+.kwaddmsg{margin:6px 0 0;font-size:14px;color:var(--ink-2);min-height:22px}
+.kwaddmsg.bad{color:var(--red-dark)}
+/* 분류 상자 */
+.kwcat{border:1px solid var(--line);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.kwcat-head{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:var(--gray);border-bottom:1px solid var(--line-2)}
+.kwcat-head h2{margin:0;font-size:18px;font-weight:800;white-space:nowrap}
+.kwcat-head .rule{font-size:14px;color:var(--ink-2);margin-top:2px}
+.kwcat-head .cnt{margin-left:auto;font-size:13px;color:var(--ink-3);white-space:nowrap;text-align:right;line-height:1.5}
+.kwcat-head .cnt b{color:var(--ink)}
+.kwlvl{display:inline-block;font-size:12px;font-weight:800;border-radius:3px;padding:0 6px;margin-left:6px;vertical-align:2px}
+.kwlvl.s{background:var(--red);color:#fff}
+.kwlvl.m{background:var(--warn);color:#fff}
+.kwlvl.w{background:var(--line);color:var(--ink)}
+.kwlvl.c{background:var(--ok);color:#fff}
+.kwchips{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px;max-height:200px;overflow:auto}
+.kwcat.tall .kwchips{max-height:none}
+.kwmore{display:block;width:100%;border:0;border-top:1px solid var(--line-2);background:#fff;padding:6px;font-size:14px;color:var(--primary-60);font-weight:600}
+.kw{display:inline-flex;align-items:center;gap:4px;min-height:32px;border:1px solid var(--ink-3);border-radius:3px;padding:1px 10px;background:#fff;font-size:15px}
+.kw:hover{background:var(--gray)}
+.kw.off{text-decoration:line-through;color:var(--ink-3);border-style:dashed;background:var(--gray)}
+.kw.off::after{content:"꺼짐";text-decoration:none;display:inline-block;margin-left:2px;font-size:11px;font-weight:700;color:var(--ink-2);
+  background:#fff;border:1px solid var(--line);border-radius:2px;padding:0 4px}
+.kw.user{border-color:var(--red);color:var(--red-dark);font-weight:600}
+.kw.user .x{font-weight:800}
+.kw.new{animation:kwpop 1.6s ease-out}
+@keyframes kwpop{0%{background:var(--hl);box-shadow:0 0 0 4px var(--hl)}100%{background:#fff;box-shadow:none}}
+@media (prefers-reduced-motion:reduce){.kw.new{animation:none;background:var(--hl)}}
+.kw.hit{background:var(--hl);border-color:#e0a800;font-weight:700}
+.kwnone{font-size:14px;color:var(--ink-3)}
+.kwfoot{display:flex;justify-content:flex-end;margin-top:6px}
+/* 오른쪽: 시험해 보기 */
+.kwtester{position:sticky;top:16px;border:2px solid var(--ink);border-radius:8px;padding:16px 18px}
+.kwtester h2{margin:0 0 4px;font-size:18px;font-weight:800}
+.kwtester .sub{margin:0 0 10px;font-size:14px;color:var(--ink-2)}
+.kwtester textarea{width:100%;min-height:96px;resize:vertical;border:1px solid var(--ink-3);border-radius:4px;padding:10px 12px;font:inherit;font-size:16px}
+.kwtester .go{width:100%;margin-top:8px}
+.kwsamples{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:13px;color:var(--ink-3);align-items:center}
+.kwsamples button{border:1px dashed var(--line);background:#fff;border-radius:999px;padding:1px 10px;font-size:13px;color:var(--ink-2)}
+.kwverdict{margin-top:14px;padding:14px;border-radius:6px;background:var(--gray);min-height:60px}
+.kwverdict.ad{background:var(--red-50)}
+.kwverdict.ok{background:var(--ok-5)}
+.kwverdict .big{font-size:20px;font-weight:800}
+.kwverdict.ad .big{color:var(--red)}
+.kwverdict.ok .big{color:var(--ok)}
+.kwverdict .split{display:grid;gap:4px}
+.kwverdict .split div{display:flex;justify-content:space-between;gap:8px;font-size:15px}
+.kwverdict .split b.ad{color:var(--red)}
+.kwverdict .split b.ok{color:var(--ok)}
+.kwverdict .split.levels{margin-top:8px}
+.kwverdict p{margin:6px 0 0;font-size:14px;color:var(--ink-2)}
+.kwverdict .w{display:inline-block;font-weight:700;color:var(--ink);background:#fff;border:1px solid var(--line-2);border-radius:3px;padding:0 6px;margin:2px 2px 0 0}
+.kwverdict .w small{font-weight:500;color:var(--ink-3);margin-left:3px}
+.kwtester .note{margin:10px 0 0;font-size:13px;color:var(--ink-3)}
+/* 결과 화면의 추가 탐색 권유 카드 */
+.searchcta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:28px;padding:14px 18px;border:1px solid var(--line);border-left:6px solid var(--primary);border-radius:4px;background:var(--primary-5)}
+.searchcta>div{flex:1;min-width:260px}
+.searchcta b{font-size:17px}
+.searchcta p{margin:4px 0 0;font-size:15px;color:var(--ink-2)}
+.searchcta .ctahealth:empty{display:none}
+.searchcta .ctahealth.bad{color:var(--red-dark);font-weight:600}
+/* 판정 등급: 색만으로 구분하지 않도록 글자와 함께 쓴다 */
+.lv{display:inline-flex;align-items:center;gap:5px;border:1px solid;border-radius:2px;padding:0 6px;font-size:13px;font-weight:700;white-space:nowrap}
+.lv::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.lv.high{color:var(--red-dark);border-color:var(--red);background:var(--red-50)}
+.lv.mid{color:#6b4e00;border-color:#d9a400;background:#fff6d6}
+.lv.review,.lv.low{color:var(--ink-2);border-color:var(--line);background:var(--gray)}
+ul.lvwhy{margin:6px 0 0;padding-left:20px;font-size:15px;color:var(--ink-2)}
+/* 상단 검색 API 연결 상태 */
+.util button.health{display:inline-flex;align-items:center;gap:6px}
+.health i{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
+.health[data-state="ok"] i{background:var(--ok)}
+.health[data-state="partial"] i{background:#d9a400}
+.health[data-state="down"] i{background:var(--red)}
+.health[data-state="checking"] i{background:var(--line-2)}
+.hlist{list-style:none;margin:0;padding:0;border-top:2px solid var(--ink)}
+.hlist li{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid var(--line-2)}
+.hlist li b{min-width:170px}
+.hlist li span{color:var(--ink-2)}
+#search-fields{border:0;padding:0}
+#search-fields input:not([type=checkbox]),#search-fields textarea{font:inherit;border:1px solid var(--line);border-radius:4px;padding:6px 10px;background:#fff}
+#search-fields label{display:inline-block;margin-right:12px;font-size:15px}
+#search-fields input[type=checkbox]{accent-color:var(--primary)}
+#search-log:empty{display:none}
+#search-fields input[type=radio]{accent-color:var(--primary)}
+#search-logbox{margin:12px 0}
+#search-logbox pre{margin:8px 0 0;padding:10px 12px;background:var(--gray);border:1px solid var(--line-2);border-radius:4px;font:13px/1.5 var(--mono)}
+#search-progress{margin:8px 0 16px}
+.sbar{height:10px;background:var(--gray-2);border-radius:2px;overflow:hidden;margin:8px 0 10px}
+.sbar i{display:block;height:100%;width:0;background:var(--primary);transition:width .4s}
+.sbar.done i{background:var(--ok)}
+@media (prefers-reduced-motion:reduce){.sbar i{transition:none}}
+#search-current{margin:0 0 12px;font-variant-numeric:tabular-nums}
+.stblwrap{max-height:340px;overflow:auto;margin:0 0 12px;border-bottom:1px solid var(--line-2)}
+table.stbl{font-size:15px}
+table.stbl th{width:auto;position:sticky;top:0;z-index:1}
+table.stbl th,table.stbl td{padding:8px 10px}
+table.stbl td{word-break:keep-all;overflow-wrap:anywhere}
+table.stbl th.n,table.stbl td.n{width:1%;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.stbl details{margin-top:4px;color:var(--ink-3)}
+table.stbl details pre{margin:4px 0 0;white-space:pre-wrap;font:13px/1.5 var(--mono)}
+.st-run{color:var(--primary-60);font-weight:700}
+.st-ok{color:var(--ok)}
+.st-bad{color:var(--red-dark);font-weight:700}
+.st-wait{color:var(--ink-3)}
+.sech{font-size:17px;margin:16px 0 6px}
+@media (max-width:480px){#search-fields input[type=number]{width:60px}table.stbl th,table.stbl td{padding:6px 8px}}
+
+/* ── 뼈대 ── */
+.app{display:grid;grid-template-rows:auto auto minmax(0,1fr) 30px;grid-template-columns:minmax(0,1fr);height:100%}
+/* 머리줄·단계·본문·바닥줄의 좌우 끝을 같은 세로선(.wrap 1200px, 안쪽 24px)에 맞춘다 */
+.gnb{display:flex;align-items:center;gap:16px;height:60px;padding:0 max(24px, calc((100% - 1152px) / 2));border-bottom:2px solid var(--ink)}
+.logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.logo img{width:32px;height:32px;display:block}   /* 프로그램 아이콘(assets/icon_preview.png)을 64px 로 줄여 넣었다 */
+.logo small{font-size:15px;font-weight:500;color:var(--ink-3);padding-left:12px;border-left:1px solid var(--line-2);letter-spacing:0}
+.util{margin-left:auto;display:flex;align-items:center}
+.util button{border:0;background:none;padding:0 12px;height:40px;font-size:15px;color:var(--ink-2)}
+.util>:last-child{padding-right:0}
+.util button+button{border-left:1px solid var(--line-2)}
+.util button:hover{color:var(--ink);text-decoration:underline}
+
+/* 단계 표시 */
+.steps{background:var(--gray);border-bottom:1px solid var(--line-2)}
+.steps ol{display:flex;margin:0 auto;padding:0 24px;list-style:none;max-width:1200px;counter-reset:s}
+.steps li{flex:1;display:flex;align-items:center;gap:10px;padding:12px 0;color:var(--ink-3);font-size:15px;font-weight:500;position:relative;white-space:nowrap}
+.steps li::before{counter-increment:s;content:counter(s);flex:none;width:28px;height:28px;border:2px solid var(--line);border-radius:50%;
+  display:grid;place-items:center;font-size:15px;font-weight:700;background:#fff}
+.steps li::after{content:"";flex:1;height:2px;background:var(--line-2);margin:0 14px}
+.steps li:last-child{flex:none}
+.steps li:last-child::after{display:none}
+.steps li.done{color:var(--ink-2)}
+.steps li.done::before{content:"✓";background:var(--ink);border-color:var(--ink);color:#fff}
+.steps li.now{color:var(--ink);font-weight:800}
+.steps li.now::before{background:var(--primary);border-color:var(--primary);color:#fff}
+
+.stage{overflow:auto;min-height:0}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 24px 48px}
+.narrow{max-width:860px}
+h1{margin:0 0 20px;font-size:32px;font-weight:800;letter-spacing:-.025em;line-height:1.35}
+h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.sec{margin-top:32px}
+.sec>h2{padding-bottom:10px;margin-bottom:14px;border-bottom:2px solid var(--ink)}
+.sec>h2+table.kv{margin-top:-14px;border-top:0}   /* 제목 밑줄과 표 윗줄이 두 줄로 겹치지 않게 */
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:48px;padding:0 20px;border:1px solid var(--ink-3);
+  background:#fff;border-radius:6px;font-size:17px;font-weight:600;white-space:nowrap}
+.btn:hover{background:var(--gray)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-60);border-color:var(--primary-60)}
+.btn.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.dark:hover{background:#000}
+.btn.lg{height:56px;padding:0 32px;font-size:19px;font-weight:700;border-radius:8px}
+.btn.sm{height:40px;padding:0 14px;font-size:15px;border-radius:4px}
+.btn.on{border-color:var(--primary);color:var(--primary-60);background:var(--primary-5)}
+
+.status{display:flex;gap:16px;align-items:center;padding:0 max(24px, calc((100% - 1152px) / 2));border-top:1px solid var(--line-2);background:var(--gray);
+  font-size:13px;color:var(--ink-3);white-space:nowrap;min-width:0}
+.status #st-left{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.status .sp{margin-left:auto;flex:0 1 50%;max-width:50%;overflow:hidden;text-overflow:ellipsis;min-width:0;
+  border:0;background:none;padding:0;height:28px;font:inherit;color:inherit;text-align:right;white-space:nowrap}
+.status .sp:hover{text-decoration:underline}
+.recordpath{word-break:break-all;white-space:pre-wrap;user-select:text}
+
+/* 안내 상자 */
+.alert{display:grid;grid-template-columns:24px minmax(0,1fr);gap:4px 12px;padding:14px 18px;border:1px solid var(--line);border-left:6px solid var(--ink-2);
+  background:var(--gray);border-radius:4px;font-size:16px}
+.alert::before{content:"!";width:24px;height:24px;border-radius:50%;background:var(--ink-2);color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
+.alert.err{border-left-color:var(--red);background:var(--red-50)}
+.alert.err::before{background:var(--red)}
+.alert>div{min-width:0}
+.alert p{margin:0}
+.alert p+p,.alert p+details,.alert details+details,.alert details+p{margin-top:6px}
+.alert summary{font-weight:600}
+.alert ul{margin:6px 0 0;padding-left:20px;font-size:15px;max-height:160px;overflow:auto}
+
+/* 맥락 도움말(KRDS): ? 단추를 눌러 열고, Enter·Space 로 여닫고, Esc 로 닫는다. 한 번에 하나만 연다 */
+.hwrap{position:relative;display:inline-flex;vertical-align:middle}
+.help-btn{position:relative;width:24px;height:24px;border:1px solid var(--ink-3);border-radius:50%;background:#fff;color:var(--ink-2);
+  font-size:13px;font-weight:700;line-height:1;padding:0;display:grid;place-items:center}
+.help-btn::after{content:"";position:absolute;inset:-10px}
+.help-btn:hover,.help-btn[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.help-pop{position:absolute;z-index:30;left:0;top:calc(100% + 8px);width:max-content;max-width:360px;padding:12px 14px;
+  background:var(--ink);color:#fff;font-size:15px;font-weight:400;line-height:1.6;border-radius:4px;white-space:normal;text-align:left}
+.help-pop.right{left:auto;right:0}
+
+/* 건너뛰기 링크: 초점을 받으면 보인다 */
+.skip{position:absolute;left:8px;top:-60px;z-index:50;padding:10px 16px;background:var(--ink);color:#fff;font-weight:700;border-radius:4px;text-decoration:none}
+.skip:focus{top:8px}
+
+/* 저장 알림(스낵바) */
+.snack{position:fixed;left:50%;bottom:48px;transform:translateX(-50%);z-index:40;padding:12px 20px;background:var(--ink);color:#fff;
+  border-radius:4px;font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,.25);max-width:calc(100% - 32px)}
+.snack button{margin-left:16px;border:0;background:none;color:#9ec1ff;font-weight:700;padding:0;white-space:nowrap}
+
+/* ── 1단계: 입력 양식 ── */
+.field{display:grid;gap:6px}
+.lbl{font-size:18px;font-weight:700}
+.help{margin:0;color:var(--ink-3);font-size:15px}
+.scopenote{margin-top:8px}
+.urlrow{display:flex;gap:8px;margin-top:4px}
+#url{flex:1;min-width:0;height:56px;padding:0 16px;border:1px solid var(--ink-3);border-radius:4px;font-size:18px}
+#url:focus{outline:3px solid var(--focus);outline-offset:0;border-color:var(--ink)}
+#starterr{margin-top:12px}
+/* 지난 점검 목록: 최근 점검이 맨 위. 다섯 줄이 넘으면 목록 안에서 내린다 */
+.runs{margin-top:28px}
+.runs h2{font-size:20px;padding-bottom:10px;border-bottom:2px solid var(--ink)}
+.runs h2 small{font-size:15px;font-weight:600;color:var(--ink-3);margin-left:6px}
+.runlist{list-style:none;margin:0;padding:0;max-height:376px;overflow:auto}
+.runlist li{display:flex;align-items:center;gap:8px;padding:12px 4px;border-bottom:1px solid var(--line-2)}
+.runlist li.cur{background:var(--primary-5)}
+.runlist .ri{flex:1;min-width:0}
+.runlist .rt{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
+.runlist .rt b{font-size:16px;font-variant-numeric:tabular-nums}
+.runlist .rt span:not(.lbl-tag){font-size:15px;color:var(--ink-2)}
+.runlist .ru{display:block;font-size:15px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn.del{color:var(--red-dark);border-color:var(--line)}
+.btn.del:hover{background:var(--red-50);border-color:var(--red)}
+
+/* 고급 설정: 입력칸 아래 작은 글자로 접어 두고, 펼치면 상자로 보인다 */
+.opts{margin-top:10px}
+.opts>summary{display:inline-flex;align-items:center;gap:4px;padding:6px 2px;font-size:15px;font-weight:600;color:var(--ink-2);cursor:pointer;list-style:none}
+.opts>summary::-webkit-details-marker{display:none}
+.opts>summary::after{content:"▾"}
+.opts[open]>summary::after{content:"▴"}
+.opts>summary:hover{color:var(--ink)}
+.optbody{margin-top:6px;border:1px solid var(--line);border-radius:4px}
+.optbody>fieldset:first-child{border-top:0}
+legend small{font-weight:500;color:var(--ink-3);margin-left:6px}
+fieldset{margin:0;padding:6px 18px 14px;border:0;border-top:1px solid var(--line-2)}
+legend{float:left;width:100%;padding:14px 0 6px;font-size:15px;font-weight:800;color:var(--ink-2)}
+.opt{clear:both;display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 12px;align-items:start;padding:10px 0}
+.opt+.opt{border-top:1px dashed var(--line-2)}
+.opt input[type=checkbox]{width:24px;height:24px;margin:2px 0 0;accent-color:var(--primary);cursor:pointer}
+.opt .name{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-weight:700;font-size:17px}
+.opt .name label{cursor:pointer}
+.opt .help{grid-column:2}
+.opt.num{grid-template-columns:minmax(0,1fr) auto}
+.opt.num .help{grid-column:1}
+.opt.num .ctl{grid-row:1/3;grid-column:2;align-self:center}
+.opt .ctl{grid-row:1/3;grid-column:3;align-self:center}
+.badge-rec{font-size:13px;font-weight:700;color:var(--primary-60);background:var(--primary-5);border-radius:4px;padding:0 6px}
+#maxp{width:120px;height:48px;border:1px solid var(--ink-3);border-radius:4px;padding:0 12px;text-align:right;font-size:16px}
+
+/* ── 2단계: 진행 ── */
+.runurl{margin:-12px 0 20px;color:var(--ink-2);font-size:16px;word-break:break-all}
+#running .sumgrid{margin-top:0}
+#running .sumgrid dd small.lim{font-size:15px;font-weight:600;color:var(--ink-3);margin-left:4px}
+.prog{height:10px;background:var(--gray-2);border-radius:2px;overflow:hidden;position:relative;margin:18px 0 12px}
+.runnow{margin:0;color:var(--ink-3);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.runnow b{color:var(--ink-2);font-weight:600;margin-right:8px}
+.runfail{margin:6px 0 0;color:var(--red-dark);font-size:15px;font-weight:600}
+.prog i{position:absolute;inset:0 auto 0 0;width:30%;background:var(--primary);animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{left:-30%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.prog i{animation:none;width:100%;opacity:.35}}
+table.kv{width:100%;border-collapse:collapse;border-top:2px solid var(--ink);font-size:16px}
+table.kv th,table.kv td{padding:11px 14px;border-bottom:1px solid var(--line-2);text-align:left;vertical-align:top}
+table.kv th{width:150px;background:var(--gray);font-weight:700;white-space:nowrap}
+table.kv td{min-width:0;word-break:break-all}
+.prog.off i{animation:none;left:0;width:100%;background:var(--line)}
+#runlost{margin-bottom:16px}
+/* 진행 화면은 본문만 내리고, 중지 단추와 저장 상태는 창이 작아도 아래에 붙여 둔다 */
+#running{display:grid;grid-template-rows:minmax(0,1fr) auto;overflow:hidden}
+.runscroll{overflow:auto;min-height:0}
+.runbar{border-top:1px solid var(--line);background:#fff;box-shadow:0 -2px 8px rgba(0,0,0,.06)}
+.runbar>div{max-width:860px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap}
+.runbar p{margin:0;color:var(--ink-3);font-size:15px;flex:1;min-width:240px}
+
+/* ── 3단계: 결과 ── */
+.titlebar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.titlebar h1{margin:0}
+.titlebar .ptag{align-self:center;font-size:15px;padding:2px 10px}
+#partialnote{margin:0 0 16px}
+#partialnote b{font-weight:800}
+.titlebar .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+/* 요약 칸은 제목·숫자 모두 한 줄. 창이 좁으면 글자를 꺾지 않고 칸을 다음 줄로 내린다 */
+.sumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));border:1px solid var(--line);border-top:2px solid var(--ink);margin-top:-1px;overflow:hidden}
+/* 칸 구분선은 왼쪽·위 그림자로 긋는다. 맨 왼쪽·맨 윗줄의 선은 바깥으로 나가 잘리므로 몇 줄로 내려가도 선이 맞는다 */
+.sumgrid div{min-width:0;padding:12px 16px;box-shadow:-1px 0 0 var(--line-2),0 -1px 0 var(--line-2)}
+.sumgrid dt,.sumgrid dd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sumgrid dt{font-size:15px;color:var(--ink-2);font-weight:600}
+.sumgrid dd{margin:2px 0 0;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.5}
+.sumgrid dd small{font-size:15px;font-weight:600;margin-left:2px}
+.sumgrid dd .note{margin-left:8px;font-size:13px;font-weight:500;color:var(--ink-3)}
+.sumgrid .hot dd{color:var(--red)}
+.sumgrid dl{margin:0;display:contents}
+#notices{display:grid;gap:8px;margin-top:16px}
+#notices:empty{display:none}
+
+/* 거르기: 상자 없이 한 줄. 검색어·처리 상태·등급 */
+.search{margin-top:20px;display:grid;gap:10px}
+.search .row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;min-width:0}
+.search .k{font-size:15px;font-weight:700;white-space:nowrap;color:var(--ink-2)}
+.search .row .k{margin-left:8px}
+.search select,.search input[type=search]{height:40px;border:1px solid var(--ink-3);border-radius:4px;padding:0 12px;background:#fff;font-size:16px}
+#q{flex:1;min-width:220px}
+.search .newonly{display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:15px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.search .newonly input{width:20px;height:20px;margin:0;accent-color:var(--primary)}
+
+.listhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:22px 0 10px}
+.listhead .total{font-size:16px}
+.listhead .total b{color:var(--primary-60);font-size:19px}
+.listhead .acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+
+table.grid{width:100%;border-collapse:collapse;table-layout:fixed;border-top:2px solid var(--ink);font-size:16px}
+table.grid th{background:var(--gray);font-weight:700;font-size:15px;padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.grid td{padding:12px;border-bottom:1px solid var(--line-2);vertical-align:middle;text-align:left}
+table.grid .num{text-align:right;font-variant-numeric:tabular-nums}
+table.grid .ctl{text-align:center}
+table.grid tbody tr:hover{background:#fafbfb}
+details.rest{margin-top:18px;border-top:1px solid var(--line);padding-top:4px}
+details.rest>summary{cursor:pointer;font-weight:700;font-size:16px;padding:10px 0}
+details.rest>summary small{font-weight:400;color:var(--ink-2);margin-left:8px}
+details.rest>.help{margin:0 0 6px}
+table.grid tr.fp td,table.grid tr.done td{color:var(--ink-3)}
+table.grid tr.done .adlink{color:var(--ink-3);font-weight:400}
+table.grid col.c-no{width:56px} table.grid col.c-st{width:176px} table.grid col.c-ty{width:150px}
+table.grid col.c-pg{width:22%} table.grid col.c-go{width:84px}
+table.grid td.ad{text-align:left}
+@media (max-width:1000px){table.grid col.c-st{width:150px} table.grid col.c-ty{width:116px} table.grid col.c-pg{width:17%} table.grid col.c-go{width:72px}}
+.adlink{border:0;background:none;padding:0;text-align:left;font-size:16px;font-weight:600;color:var(--ink);
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none}
+.adlink:hover{text-decoration:underline;text-underline-offset:3px}
+/* 등급·확인 표시는 광고 문구 오른쪽에 둔다 */
+.adcell{display:flex;align-items:center;gap:8px;min-width:0}
+.adcell .adlink{min-width:0}
+.subtags{display:flex;flex-wrap:wrap;gap:4px;flex:none}
+td.pg{text-align:left;font-size:15px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.manage select{width:100%;height:40px;border:1px solid var(--ink-3);border-radius:4px;padding:0 6px;background:#fff;font-size:15px;font-weight:600}
+.manage select.open{color:var(--red-dark);border-color:var(--red)}
+.ghead td{background:#fbfbfc;text-align:left;font-weight:700;font-size:15px;color:var(--ink-2);padding:8px 12px}
+.emptyrow td{padding:36px 10px;color:var(--ink-3)}
+.lbl-tag{display:inline-block;border:1px solid var(--ink-3);border-radius:2px;padding:0 6px;font-size:13px;font-weight:700;color:var(--ink-2);background:#fff;white-space:nowrap}
+.lbl-tag.red{border-color:var(--red);color:var(--red-dark)}
+.lbl-tag.warn{background:var(--red-50);border-color:var(--red);color:var(--red-dark)}
+.lbl-tag.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+.lbl-tag.ok{border-color:var(--ok);color:var(--ok)}
+.empty{margin-top:24px;padding:48px 20px;border:1px solid var(--line);border-radius:4px;text-align:center;color:var(--ink-2)}
+.empty b{display:block;font-size:22px;color:var(--ink);margin-bottom:6px}
+
+/* ── 4단계: 상세 ── */
+dialog.detaildlg{max-width:960px;width:calc(100% - 48px);height:min(90vh,1000px)}
+dialog.detaildlg[open]{display:flex;flex-direction:column}
+#detailview{display:flex;flex-direction:column;flex:1;min-height:0}
+.dd-head{display:flex;align-items:center;gap:10px;padding:14px 18px 14px 22px;border-bottom:2px solid var(--ink);background:#fff}
+.dd-head .d-title{flex:1;min-width:0;margin:0;font-size:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-head .pos{font-size:15px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dd-status{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;padding:12px 22px;background:var(--gray);border-bottom:1px solid var(--line)}
+.dd-status .radios{padding:0;gap:8px 22px}
+.dd-status #dmemo{flex:1;min-width:220px;height:40px;border:1px solid var(--ink-3);border-radius:4px;padding:0 12px;font-size:16px;background:#fff}
+.dd-body{flex:1;min-height:0;overflow:auto;padding:18px 22px 28px}
+.dd-body>.kv:first-child{margin-top:0}
+.dd-body .sec:first-of-type{margin-top:24px}
+.dd-foot{display:flex;justify-content:space-between;gap:8px;padding:12px 22px;border-top:1px solid var(--line);background:#fff}
+.d-title{margin:8px 0 6px;font-size:24px;font-weight:800;line-height:1.5;white-space:pre-wrap}
+.d-tags{display:flex;flex-wrap:wrap;gap:6px}
+.radios{display:flex;flex-wrap:wrap;gap:8px 24px;padding:4px 0 2px}
+.radios label{display:inline-flex;align-items:center;gap:8px;font-size:17px;font-weight:600;cursor:pointer}
+.radios input{width:24px;height:24px;margin:0;accent-color:var(--primary)}
+.radios label.dis{color:var(--ink-3);cursor:not-allowed}
+.record .help{margin-top:6px}
+.memo{display:grid;gap:6px;margin-top:14px}
+.memo label{font-weight:700}
+.memo input{height:48px;border:1px solid var(--ink-3);border-radius:4px;padding:0 14px;font-size:16px}
+.record{border:1px solid var(--line);border-radius:4px;padding:16px 18px}
+.record + .record{margin-top:16px}
+#dexurl,#dexreason{display:block;width:100%;max-width:100%;margin:6px 0 12px;padding:10px;border:1px solid var(--line);border-radius:4px;font:inherit}
+#exclusionslist li{display:block;padding:12px 0;border-bottom:1px solid var(--line-2);overflow-wrap:anywhere}
+.record legend{float:none;padding:0 0 4px;font-size:16px;color:var(--ink)}
+.record fieldset{padding:0;border:0}
+ol.fix{margin:0;padding:0;list-style:none;counter-reset:f;display:grid;gap:10px}
+ol.fix li{position:relative;padding:14px 18px 14px 58px;border:1px solid var(--line-2);border-radius:4px;font-size:17px;line-height:1.6}
+ol.fix li::before{counter-increment:f;content:counter(f) "단계";position:absolute;left:12px;top:15px;font-size:13px;font-weight:800;color:var(--primary-60)}
+.shot{border:1px solid var(--line);overflow:auto;max-height:520px;background:var(--gray)}
+.shot img{display:block;max-width:100%}
+.cap{margin:6px 0 0;font-size:15px;color:var(--ink-3)}
+details.more{border:1px solid var(--line);border-radius:4px;margin-top:10px}
+details.more>summary{padding:13px 18px;font-weight:700;font-size:17px}
+details.more>div{padding:0 18px 18px}
+iframe.page{width:100%;height:520px;border:1px solid var(--line);background:#fff}
+pre.src{margin:0;padding:14px 16px;background:#1e2124;color:#eef0f2;font:15px/1.6 var(--mono);white-space:pre-wrap;word-break:break-all;max-height:420px;overflow:auto;border-radius:2px}
+.sharedbox{margin-bottom:14px}
+
+/* ── 대화상자 ── */
+dialog.dlg{width:calc(100% - 32px);max-width:780px;border:2px solid var(--ink);border-radius:12px;overflow:hidden;padding:0;color:var(--ink)}
+dialog.dlg::backdrop{background:rgba(0,0,0,.5)}
+/* 확인·알림 창: 브라우저 기본 창(제목에 주소·포트가 붙는다) 대신 쓴다 */
+dialog.ask{max-width:480px}
+.ask .dlg-head{padding-right:22px}
+.ask .askmsg{margin:0;white-space:pre-line;color:var(--ink-2)}
+.ask .dlg-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 22px 20px}
+.btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger:hover{background:var(--red-dark);border-color:var(--red-dark)}
+.dlg-scroll{max-height:min(84vh,780px);overflow:auto}
+.dlg-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:14px 22px;background:#fff;border-bottom:2px solid var(--ink)}
+.dlg-head h2{font-size:20px}
+.dlg-close{position:absolute;top:12px;right:18px;z-index:3}
+.dlg-head{padding-right:110px}
+.dlg-body{padding:18px 22px 24px}
+.dlg-body .lead{margin:0 0 14px;color:var(--ink-2)}
+.dlg-body h3{font-size:17px;margin:20px 0 8px}
+.g-steps{margin:0 0 6px;padding:0;list-style:none;counter-reset:g;display:grid;gap:8px}
+.g-steps li{position:relative;padding:12px 16px 12px 56px;border:1px solid var(--line-2);border-radius:4px}
+.g-steps li::before{counter-increment:g;content:counter(g);position:absolute;left:16px;top:13px;width:26px;height:26px;border-radius:50%;
+  background:var(--ink);color:#fff;font-weight:800;font-size:15px;display:grid;place-items:center}
+.g-steps b{display:block}
+.g-steps p{margin:2px 0 0;color:var(--ink-2);font-size:15px}
+.closed{display:grid;place-items:center;height:100%;font-size:22px;font-weight:800}
+</style>
+</head>
+<body>
+<a class="skip" id="skip" href="#main">본문 바로가기</a>
+<div class="app" id="app">
+
+  <header class="gnb">
+    <div class="logo"><img src="data:image/png;base64,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" alt="" width="32" height="32">훤히 <small>누리집 불법광고 점검 도구</small></div>
+    <div class="util">
+      <button id="apihealth" class="health" type="button" aria-haspopup="dialog" data-state="checking"><i aria-hidden="true"></i><span id="apihealthtext">검색 API 확인 중</span></button>
+      <button id="kwbtn" type="button">점검 키워드</button>
+      <button id="exclusionsbtn" type="button" aria-haspopup="dialog">점검 제외 목록</button>
+      <button id="help" type="button">도움말</button>
+      <button id="quit" type="button">프로그램 종료</button>
+    </div>
+  </header>
+
+  <nav class="steps" aria-label="진행 단계">
+    <ol id="steps">
+      <li data-s="1">주소 입력</li>
+      <li data-s="2">점검</li>
+      <li data-s="3">결과 확인</li>
+    </ol>
+    <div class="pagebar" id="kwbar" hidden>
+      <button class="btn sm" id="kwback" type="button">← 주소 입력으로</button>
+      <span>점검 흐름과 별도인 설정 화면입니다. 바꾼 내용은 다음 점검부터 적용됩니다.</span>
+    </div>
+  </nav>
+
+
+
+  <!-- 1단계: 주소 입력 -->
+  <section class="stage" id="start">
+    <div class="wrap narrow">
+      <h1>점검할 누리집 주소를 입력하십시오</h1>
+      <div class="field">
+        <label class="sr" for="url">누리집 주소</label>
+        <div class="urlrow">
+          <input id="url" type="url" placeholder="예: https://www.example.go.kr/board/list" autocomplete="off">
+          <button id="go" class="btn primary lg" type="button">점검 시작</button>
+        </div>
+      </div>
+      <div id="starterr" class="alert err" role="alert" hidden><div><p id="starterrmsg"></p></div></div>
+
+      <details class="opts">
+        <summary>고급 설정</summary>
+        <div class="optbody">
+        <fieldset>
+          <legend>점검 범위</legend>
+          <div class="opt num"><div class="name"><label for="scan-minutes">점검 시간</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hmin" aria-label="점검 시간 도움말">?</button><span class="help-pop" id="hmin" hidden>시간이 되면 결과를 저장합니다. 남은 작업은 이어서 점검할 수 있습니다.</span></span></div>
+            <div class="ctl"><select id="scan-minutes"><option value="25">25분</option><option value="50">50분</option><option value="120">120분</option></select></div></div>
+          <div class="opt num"><div class="name"><label for="maxp">최대 페이지 수</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="h1" aria-label="최대 페이지 수 도움말">?</button><span class="help-pop" id="h1" hidden>이 수만큼 페이지를 점검하면 멈춥니다. 기본값은 5000입니다.</span></span></div>
+            <div class="ctl"><input id="maxp" type="number" min="1" max="5000" value="5000"></div></div>
+          <div class="opt"><input type="checkbox" id="polite"><div class="name"><label for="polite">천천히 점검</label> <span class="badge-rec">운영 중인 누리집 권장</span>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="h2" aria-label="천천히 점검 도움말">?</button><span class="help-pop" id="h2" hidden>페이지 사이에 0.7초씩 쉬고, robots.txt 가 막아 둔 주소는 건너뜁니다. 보안 관제에서 공격으로 오인되거나 서버에 부담을 주는 일을 막습니다. 300페이지면 3~4분쯤 더 걸립니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="subdomains"><div class="name"><label for="subdomains">서브도메인도 점검</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="h3" aria-label="서브도메인도 점검 도움말">?</button><span class="help-pop" id="h3" hidden>같은 기관의 다른 주소(bbs.기관.go.kr, 기관.go.kr:8080 등)도 점검합니다. 다른 기관 누리집은 켜도 점검하지 않습니다.</span></span></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>추가 검사 <small>켜면 시간이 더 걸립니다</small></legend>
+          <div class="opt"><input type="checkbox" id="extra-types"><div class="name"><label for="extra-types">추가 광고 유형 검사</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hextra" aria-label="추가 광고 유형 검사 도움말">?</button><span class="help-pop" id="hextra" hidden>기본 4종(닮은꼴 글자 위장·자모 분해·투명 텍스트·화면 밖 은닉) 외에 노출 광고·메타 태그·속성·외부 링크 등도 확인합니다. 다른 추가 검사를 켜면 함께 검사합니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="capture"><div class="name"><label for="capture">검출 증거 사진 저장</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hcap" aria-label="검출 증거 사진 저장 도움말">?</button><span class="help-pop" id="hcap" hidden>검출한 요소의 화면과 원본 코드를 저장합니다. 켜야 결과 상세에서 증거 사진·원본 코드를 볼 수 있습니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="snapshots"><div class="name"><label for="snapshots">방문 페이지 사본 저장</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hsnap" aria-label="방문 페이지 사본 저장 도움말">?</button><span class="help-pop" id="hsnap" hidden>방문한 페이지의 HTML을 저장합니다. 켜야 결과 상세에서 점검 때 누리집 화면을 볼 수 있습니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="attach"><div class="name"><label for="attach">첨부파일 검사</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hatt" aria-label="첨부파일 검사 도움말">?</button><span class="help-pop" id="hatt" hidden>PDF·HWP·HWPX, 오피스 문서, ZIP 압축 파일, 그림 파일 안의 글자도 검사합니다. 파일을 열거나 실행하지는 않습니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="reflect"><div class="name"><label for="reflect">검색창 점검</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="h4" aria-label="검색창 점검 도움말">?</button><span class="help-pop" id="h4" hidden>검색창이 광고 문구를 되비춰 검색 결과에 악용될 수 있는지 봅니다. 검색창마다 무해한 글자로 한 번만 검색해 봅니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="links"><div class="name"><label for="links">연계 링크 확인</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="h5" aria-label="연계 링크 확인 도움말">?</button><span class="help-pop" id="h5" hidden>패밀리 사이트·배너 링크가 도박·성인 사이트로 바뀌지 않았는지 봅니다. 바깥 도메인마다 첫 화면 글자만 한 번 받아 보며 스크립트는 실행하지 않습니다. 공공기관(go.kr 등) 누리집은 조회하지 않고, 인터넷이 막힌 PC 에서는 결과가 나오지 않습니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="ocrimg"><div class="name"><label for="ocrimg">그림 속 글자 검사</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="h6" aria-label="그림 속 글자 검사 도움말">?</button><span class="help-pop" id="h6" hidden>게시글·배너 그림을 Windows 글자 인식으로 읽어 광고 문구를 찾습니다. 그림은 이 PC 안에서만 읽고 밖으로 보내지 않습니다. 한국어 글자 인식이 없는 PC 에서는 건너뜁니다.</span></span></div></div>
+          <div class="opt"><input type="checkbox" id="cloaking"><div class="name"><label for="cloaking">크롤러 위장 검사</label>
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hcloak" aria-label="크롤러 위장 검사 도움말">?</button><span class="help-pop" id="hcloak" hidden>검색엔진 로봇에게만 광고를 보여주는 페이지를 찾습니다.</span></span></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>색인 목록</legend>
+          <div class="opt num"><div class="name">Search Console 색인 목록
+              <span class="hwrap"><button type="button" class="help-btn" aria-expanded="false" aria-controls="hidx" aria-label="색인 목록 도움말">?</button><span class="help-pop" id="hidx" hidden>구글에 이미 올라간 주소 목록(CSV)에 광고가 보이는지 확인합니다.</span></span></div>
+            <input type="file" id="idxfile" accept=".csv,.txt,text/csv,text/plain" hidden>
+            <div class="ctl"><button id="idxbtn" class="btn" type="button">목록 파일 고르기</button></div></div>
+        </fieldset>
+        </div>
+      </details>
+
+      <p class="help" id="exclusionshint">오탐을 직접 확인한 주소는 결과 상세에서 다음 점검 대상에서 제외할 수 있습니다.</p>
+      <section class="runs" id="runsbox" aria-labelledby="runsh" hidden>
+        <h2 id="runsh">지난 점검 결과 <small id="runscount"></small></h2>
+        <ul class="runlist" id="runlist"></ul>
+      </section>
+    </div>
+  </section>
+
+  <!-- 2단계: 점검 -->
+  <section class="stage" id="running" hidden>
+    <div class="runscroll"><div class="wrap narrow">
+      <h1>누리집을 점검하고 있습니다</h1>
+      <p class="runurl" id="runurl"></p>
+      <div id="runlost" class="alert err" role="alert" hidden><div><p id="runlostmsg"></p></div></div>
+      <div class="sumgrid" id="runcounts"><dl>
+        <div><dt>분석한 페이지</dt><dd id="rc-done">0</dd></div>
+        <div><dt>대기 중인 주소</dt><dd id="rc-pending">0</dd></div>
+        <div><dt>찾은 의심 항목</dt><dd id="rc-found">0<small>건</small></dd></div>
+        <div><dt>지난 시간</dt><dd id="rc-time">0초</dd></div>
+      </dl></div>
+      <div class="prog" aria-hidden="true"><i></i></div>
+      <p class="runnow" id="runmsg">누리집을 여는 중입니다</p>
+      <p class="runfail" id="runfail" hidden></p>
+    </div></div>
+    <div class="runbar"><div>
+      <button id="stop" class="btn dark" type="button">점검 중지</button>
+      <p>중지해도 지금까지의 결과는 저장됩니다.</p>
+    </div></div>
+  </section>
+
+  <!-- 3단계: 결과 확인 (상세·조치 기록은 팝업) -->
+  <section class="stage" id="body" hidden>
+    <div class="wrap">
+      <!-- 결과 목록 -->
+      <div id="listview">
+        <div class="titlebar">
+          <h1>점검 결과</h1>
+          <span class="lbl-tag dark ptag" id="ptag" hidden>부분 점검 결과</span>
+          <div class="acts" id="topinfo">
+            <button id="resume-scan" class="btn dark" type="button" hidden>이어서 점검</button>
+            <button id="again" class="btn" type="button">다시 점검</button>
+          </div>
+        </div>
+        <div class="alert" id="partialnote" hidden><div id="partialtext"></div></div>
+        <table class="kv">
+          <caption class="sr">점검 정보</caption>
+          <tbody>
+            <tr><th scope="row">점검 주소</th><td id="topurl"></td><th scope="row">점검 일시·범위</th><td id="topmeta"></td></tr>
+          </tbody>
+        </table>
+        <p class="help scopenote" id="checkscope" hidden></p>
+        <div class="sumgrid" id="sumgrid" role="group" aria-label="결과 요약"></div>
+        <div id="notices"></div>
+
+        <div id="listpart">
+          <div class="search" id="searchbox" role="search" aria-label="검색 조건">
+            <div class="row">
+              <input id="q" type="search" placeholder="광고 문구나 주소로 찾기" aria-label="검색어">
+              <label class="k" for="statusf">처리 상태</label>
+              <select id="statusf">
+                <option value="all">전체</option>
+                <option value="open">미확인</option>
+                <option value="done">확인</option>
+                <option value="fp">오탐 처리</option>
+              </select>
+              <label class="k" for="levelf">등급</label>
+              <select id="levelf">
+                <option value="all">전체</option>
+                <option value="high">확실</option>
+                <option value="mid">의심</option>
+                <option value="low">경계</option>
+              </select>
+              <label class="newonly" id="newonlybox" hidden><input type="checkbox" id="newonly"> 새로 생긴 것만</label>
+            </div>
+          </div>
+          <div class="listhead">
+            <span class="total" id="total" aria-live="polite"></span>
+            <button class="btn sm" id="clearf" type="button" hidden>검색 조건 초기화</button>
+            <div class="acts">
+              <button class="btn sm" id="report">보고서 출력</button>
+              <button class="btn sm" id="csv">엑셀(CSV) 내려받기</button>
+              <button class="btn sm" id="run-history">점검·조치 이력</button>
+            </div>
+          </div>
+          <table class="grid" id="grid">
+            <caption class="sr">검토가 필요한 의심 항목 목록. 처리 상태를 바로 바꿀 수 있고, 광고 문구를 누르면 상세를 봅니다.</caption>
+            <colgroup><col class="c-no"><col class="c-st"><col class="c-ad"><col class="c-ty"><col class="c-pg"><col class="c-go"></colgroup>
+            <thead><tr><th scope="col" class="num">번호</th><th scope="col">처리 상태</th><th scope="col">광고 문구</th><th scope="col">유형</th><th scope="col" class="n">페이지</th><th scope="col" class="ctl">상세</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <details class="rest" id="restbox" hidden>
+            <summary id="restsum"></summary>
+            <p class="help">처리를 마친 항목입니다. 처리 상태를 되돌리거나 상세를 볼 수 있습니다.</p>
+            <table class="grid" id="restgrid">
+              <caption class="sr">오탐 처리·확인 항목 목록</caption>
+              <colgroup><col class="c-no"><col class="c-st"><col class="c-ad"><col class="c-ty"><col class="c-pg"><col class="c-go"></colgroup>
+              <thead><tr><th scope="col" class="num">번호</th><th scope="col">처리 상태</th><th scope="col">광고 문구</th><th scope="col">유형</th><th scope="col">페이지</th><th scope="col" class="ctl">상세</th></tr></thead>
+              <tbody id="restrows"></tbody>
+            </table>
+          </details>
+        </div>
+        <div class="empty" id="emptyall" hidden></div>
+        <!-- 검색엔진 추가 탐색 안내는 결과 목록을 다 본 뒤 맨 아래에 둔다 -->
+        <div class="searchcta" id="searchcta" hidden>
+          <div><b>검색엔진에 노출된 광고도 찾아보시겠습니까?</b>
+            <p>누리집 안을 둘러보는 점검으로는 찾기 어려운, 구글에 이미 올라간 광고 주소를 검색 API로 모읍니다. 검색할 때마다 API 이용 한도가 차감됩니다.</p>
+            <p class="ctahealth" id="ctahealth"></p></div>
+          <button id="search-open" class="btn primary" type="button">추가 탐색하기</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3단계 선택: 검색엔진 추가 탐색 (결과 화면에서 들어온다) -->
+  <section class="stage" id="searchstage" hidden>
+    <div class="wrap narrow">
+      <div class="searchnav"><button class="btn" id="search-back" type="button">← 점검 결과로</button></div>
+      <h1>검색엔진 추가 탐색</h1>
+      <div id="search-assist">
+        <p>내부 점검으로 찾기 어려운 검색 노출 URL을 수집합니다. 공공 누리집 불법광고에 자주 나오는 단어를 광고 유형별로 정해 두었으니,
+          검색할 유형만 고르십시오. 단어마다 따로 검색하며, 검색할 때마다 API 이용 한도가 차감됩니다.</p>
+        <fieldset id="search-fields" style="border:0;padding:0">
+          <label>대상 도메인 <input id="search-site" placeholder="www.example.go.kr" style="width:260px"></label>
+          <button id="search-copy" class="btn sm" type="button">점검 주소로 되돌리기</button>
+          <p id="search-scopenote" class="help" aria-live="polite"></p>
+          <fieldset id="search-groups" style="border:0;padding:0;margin:12px 0">
+            <legend><b>검색할 광고 유형</b></legend>
+            <div id="search-grouplist"></div>
+            <label id="search-foundrow" hidden><input id="search-found" type="checkbox" checked>
+              이번 점검에서 찾은 단어 <span id="search-foundwords" class="help"></span></label>
+          </fieldset>
+          <details id="search-advanced">
+            <summary>고급: 검색 단어 직접 입력</summary>
+            <p><label for="search-terms">추가로 검색할 단어 (한 줄에 하나)</label></p>
+            <textarea id="search-terms" rows="3" style="width:100%;max-width:600px" placeholder="예) 먹튀검증&#10;가입머니"></textarea>
+          </details>
+          <p id="search-estimate" class="help" aria-live="polite"></p>
+          <details id="search-options" style="margin:10px 0 16px">
+            <summary>상세 설정 <small>바꾸지 않아도 됩니다 · 검색엔진은 구글입니다</small></summary>
+            <fieldset id="search-scopebox" style="border:0;padding:0;margin:12px 0">
+              <legend><b>검색 범위</b></legend>
+              <label style="display:block;margin:4px 0"><input id="search-scope-domain" name="search-scope" type="radio" value="domain" checked>
+                등록 도메인 전체(하위 도메인 포함) — 기본</label>
+              <label style="display:block;margin:4px 0"><input id="search-scope-host" name="search-scope" type="radio" value="host">
+                입력한 주소만</label>
+              <label id="search-subsrow" style="display:block;margin:4px 0 4px 24px" hidden><input id="search-subs" type="checkbox">
+                입력한 주소 아래의 하위 도메인도 포함</label>
+            </fieldset>
+            <p style="margin-bottom:2px"><label><input id="search-inspect" type="checkbox"> 수집한 주소에 접속해 지금도 광고가 있는지 확인</label></p>
+            <p class="help" style="margin-top:0">끄면 검색 결과만 모으고 누리집에는 접속하지 않습니다. 켜면 수집한 페이지에 접속해
+              삭제된 글(404·410)과 지금도 광고가 있는 글을 가려냅니다.</p>
+            <p><label>키워드당 최대 페이지 <input id="search-pages" type="number" value="2" min="1" max="10" style="width:70px"></label>
+              <label style="margin-left:16px"><input id="search-omitted" type="checkbox"> 구글 생략 필터 해제 (비교용)</label></p>
+          </details>
+        </fieldset>
+        <div><button id="search-go" class="btn primary" type="button">보조 탐색 시작</button>
+          <button id="search-stop" class="btn sm" type="button" disabled hidden>검색 중지</button>
+          <button id="search-resume" class="btn sm" type="button" disabled hidden>대기 결과 회수</button>
+          <a id="search-report" class="btn sm" href="/api/search/files/report.html" target="_blank" rel="noopener" hidden>검색 보고서 열기</a></div>
+        <details id="search-history" hidden>
+          <summary id="search-history-summary">지난 검색 보기</summary>
+          <p class="help">이 컴퓨터에 저장된 지난 검색입니다. 열면 그 검색의 수집 URL 수·보고서·제출 반영 건수를 위에서처럼 볼 수 있습니다.
+            새 검색을 시작하면 보고 있던 결과는 새 검색으로 바뀝니다.</p>
+          <p id="search-history-msg" class="help" role="status" aria-live="polite"></p>
+          <ul id="search-history-list" style="list-style:none;padding:0;margin:0"></ul>
+        </details>
+        <p id="search-keynote" class="help" role="alert" hidden><span id="search-keynote-text"></span>
+          <button id="search-keyopen" class="btn sm" type="button">검색 API 설정 열기</button></p>
+        <p id="search-status" role="status" aria-live="polite">검색 준비 · 검색 API 키가 필요합니다.</p>
+        <div id="search-progress" hidden>
+          <div class="sbar" id="search-bar" role="progressbar" aria-label="검색 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+          <p id="search-current" class="help" hidden></p>
+          <div class="stblwrap"><table class="kv stbl" id="search-termtable">
+            <caption class="sr">단어별 검색 상태</caption>
+            <thead><tr><th scope="col">검색 단어</th><th scope="col" class="n">상태</th><th scope="col" class="n">수집 URL</th></tr></thead>
+            <tbody id="search-termrows"></tbody>
+          </table></div>
+        </div>
+        <div id="search-errors" hidden>
+          <h2 class="sech">확인이 필요한 질의 <span id="search-errcount"></span>건</h2>
+          <div class="stblwrap"><table class="kv stbl" id="search-errtable">
+            <caption class="sr">확인이 필요한 질의</caption>
+            <thead><tr><th scope="col">검색 단어</th><th scope="col" class="n">페이지</th><th scope="col">사유</th></tr></thead>
+            <tbody id="search-errrows"></tbody>
+          </table></div>
+        </div>
+        <div id="search-submission" role="status" aria-live="polite" hidden>
+          <p><b id="search-submission-head"></b></p>
+          <p id="search-submission-types" class="help"></p>
+          <p id="search-submission-file" class="help"></p>
+        </div>
+        <details id="search-logbox">
+          <summary>상세 로그 보기</summary>
+          <pre id="search-log" style="white-space:pre-wrap;max-height:180px;overflow:auto"></pre>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- 점검 키워드 관리: 머리의 [점검 키워드]로 들어오고, 돌아가기로 들어오기 전 화면에 돌아간다 -->
+  <section class="stage" id="kwstage" hidden>
+    <div class="wrap wide">
+      <h1>점검 키워드 관리</h1>
+      <ol class="howto">
+        <li><b>단어 끄고 켜기</b>왼쪽 목록에서 단어를 누르면 꺼지고, 다시 누르면 켜집니다. 꺼진 단어로는 광고를 찾지 않습니다.</li>
+        <li><b>단어 추가</b>위 칸에서 분류를 고르고 단어를 넣으면 그 분류 목록에 빨간색으로 바로 나타납니다.</li>
+        <li><b>시험해 보기</b>오른쪽에 문장을 넣고 [판정 보기]를 누르면 광고로 볼지와 찾은 단어를 보여 줍니다.</li>
+      </ol>
+      <p class="applied">바꾼 내용은 바로 저장되며, <b>다음 점검부터</b> 적용됩니다. 점검 중에는 단어를 바꿀 수 없습니다.</p>
+      <div class="alert err" id="kwerr" role="alert" hidden><div><p id="kwerrmsg"></p></div></div>
+
+      <div class="kwlayout">
+        <section aria-label="단어 목록">
+          <div class="kwtool">
+            <div class="kwaddrow">
+              <select id="kwcat" aria-label="추가할 분류"></select>
+              <input id="kwword" placeholder="추가할 단어 (띄어쓰기는 무시됩니다)" aria-label="추가할 단어" autocomplete="off">
+              <button id="kwadd" class="btn primary" type="button">추가</button>
+              <span class="gap" aria-hidden="true"></span>
+              <input id="kwfind" type="search" placeholder="목록에서 찾기" aria-label="목록에서 찾기" autocomplete="off">
+            </div>
+            <p class="kwaddmsg" id="kwaddmsg" aria-live="polite"></p>
+          </div>
+          <div id="kwcats"></div>
+          <div class="kwfoot"><button id="kwreset" class="btn sm" type="button">기본값으로 되돌리기</button></div>
+        </section>
+
+        <aside class="kwtester" aria-labelledby="kwth">
+          <h2 id="kwth">시험해 보기</h2>
+          <p class="sub">단어를 바꾸기 전후로, 정상 공지 문장이 광고로 잡히지 않는지 확인하십시오.</p>
+          <textarea id="kwtest" aria-label="시험할 문장" placeholder="예: 성인 라방 무료 입장 텔레 @abc123"></textarea>
+          <button id="kwgo" class="btn primary go" type="button">판정 보기</button>
+          <div class="kwsamples" id="kwsamples">예시:
+            <button type="button">꽁머니 지급</button>
+            <button type="button">ｍｅｇａ－ＢＥＴ 첫충 30% 지급</button>
+            <button type="button">ㅋㅏㅈㅣㄴㅗ 텔레 @abc123 가입머니 3만원</button>
+            <button type="button">불법 도박 예방 상담센터 안내</button>
+          </div>
+          <div class="kwverdict" id="kwout" aria-live="polite"><p style="margin:0">문장을 넣고 [판정 보기]를 누르십시오.</p></div>
+          <p class="note">찾은 단어는 왼쪽 목록에도 노랗게 표시됩니다.</p>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <footer class="status">
+    <span id="st-left">대기 중</span>
+    <button class="sp" id="st-right" type="button" aria-haspopup="dialog" hidden></button>
+  </footer>
+</div>
+
+<div class="sr" id="live" aria-live="polite"></div>
+<div class="snack" id="snack" role="status" hidden></div>
+
+<!-- 상세: 결과 목록 위에 뜨는 팝업. 머리(문구·닫기)와 바닥(이전·다음)은 고정하고 본문만 내린다 -->
+<dialog class="dlg detaildlg" id="detaildlg" aria-labelledby="dtitle">
+  <div id="detailview"></div>
+</dialog>
+
+<dialog class="dlg" id="exclusionsdlg" aria-labelledby="exclusionsh">
+  <div class="dlg-scroll">
+    <div class="dlg-head"><h2 id="exclusionsh">점검 제외 목록</h2></div>
+    <form method="dialog"><button class="btn sm dlg-close" autofocus>닫기</button></form>
+    <div class="dlg-body">
+      <p>이 출력 폴더에서 실행하는 새 점검·검색 결과 재검사에 적용됩니다. 이어서 점검은 원래 회차의 제외 목록을 유지합니다. 제외를 해제하면 다음 점검부터 다시 검사합니다. 기존 오탐 처리 상태와 확인 이력은 남습니다.</p>
+      <p class="help">제외한 페이지의 내용 변경과 그 안에서만 연결된 다른 페이지는 확인하지 않습니다.</p>
+      <ul class="runlist" id="exclusionslist"></ul>
+      <p id="exclusionserr" role="alert"></p>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="recordpathdlg" aria-labelledby="recordpathh">
+  <div class="dlg-scroll">
+    <div class="dlg-head"><h2 id="recordpathh">실행 기록 위치</h2></div>
+    <form method="dialog"><button class="btn sm dlg-close" autofocus>닫기</button></form>
+    <div class="dlg-body"><p class="lead">점검 결과와 증거가 저장된 폴더입니다.</p><p class="recordpath" id="recordpathtext"></p></div>
+  </div>
+</dialog>
+
+<dialog class="dlg ask" id="askdlg" aria-labelledby="askh" aria-describedby="askmsg">
+  <form method="dialog">
+    <div class="dlg-head"><h2 id="askh">확인</h2></div>
+    <div class="dlg-body"><p class="askmsg" id="askmsg"></p></div>
+    <div class="dlg-foot"><button class="btn" id="askcancel" value="cancel">취소</button><button class="btn primary" id="askok" value="ok">확인</button></div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="healthdlg" aria-labelledby="healthh">
+  <div class="dlg-scroll">
+    <div class="dlg-head"><h2 id="healthh">검색 API 설정</h2></div>
+    <form method="dialog"><button class="btn sm dlg-close" autofocus>닫기</button></form>
+    <div class="dlg-body">
+      <p class="lead">SerpApi 키 하나로 구글을 검색합니다. 저장한 키는 이 컴퓨터의 search.env에 보관합니다.</p>
+      <form id="keyform" autocomplete="off">
+        <label for="search-key">SerpApi API 키</label>
+        <div style="display:flex;gap:8px;margin:8px 0">
+          <input id="search-key" type="password" autocomplete="new-password" spellcheck="false" maxlength="512" style="flex:1;min-width:0" placeholder="새 API 키 입력" aria-describedby="keystate">
+          <button id="keyshow" class="btn" type="button" aria-pressed="false">보기</button>
+        </div>
+        <p id="keystate" class="help" aria-live="polite">등록 상태 확인 중…</p>
+        <button id="keysave" class="btn primary" type="submit">저장 및 연결 확인</button>
+        <button id="keydelete" class="btn" type="button" disabled>키 삭제</button>
+        <p id="keymessage" class="help" role="status"></p>
+      </form>
+      <ul class="hlist" id="healthlist"></ul>
+      <p class="help" id="healthmeta"></p>
+      <p class="help">구글 연결 확인은 이용 한도를 차감하지 않습니다.</p>
+      <button id="healthrefresh" class="btn" type="button">다시 확인</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="guide" aria-labelledby="gh">
+  <div class="dlg-scroll">
+    <div class="dlg-head"><h2 id="gh">사용 방법</h2></div>
+    <div class="dlg-body" id="guidebody"></div>
+  </div>
+  <button class="btn sm dlg-close" id="guideclose" type="button">닫기</button>
+</dialog>
+
+<script>
+const TECHS = { HOMOGLYPH:"닮은꼴 글자 위장", JAMO:"자모 분해",
+  TRANSPARENT:"투명 텍스트", OFFSCREEN:"화면 밖 은닉", ETC:"추가 유형" };
+const GUIDE = {
+  HOMOGLYPH:["게시물 작성·수정 화면에서 해당 문자열을 삭제합니다.",
+    "입력 단계에서 전각·키릴 문자가 섞인 문자열을 차단하도록 게시판 필터를 보완합니다."],
+  JAMO:["게시물에서 자모로 분해된 문자열을 삭제합니다.",
+    "자모만 연속되는 입력을 걸러내는 검증 규칙을 추가합니다."],
+  TRANSPARENT:["해당 요소와 인라인 스타일을 함께 제거합니다.",
+    "편집기에서 색상·투명도 인라인 스타일 사용을 제한합니다."],
+  OFFSCREEN:["숨겨진 요소를 삭제합니다. 화면에 보이지 않으므로 소스 보기로 확인해야 합니다.",
+    "검색엔진에 이미 수집되었을 수 있으므로 색인 삭제를 함께 요청합니다."],
+  ETC:["검출된 위치를 확인해 해당 문구나 요소를 삭제합니다.",
+    "크롤러 위장인 경우 서버 설정이나 삽입된 스크립트를 함께 점검합니다."],
+};
+const STATUS = { open:"미확인", done:"확인", fp:"오탐 처리" };
+// 담당자가 직접 고르는 상태. [조치 확인]으로 광고가 사라진 것을 확인해도 '확인'이 붙는다
+const PICK = { open:"미확인", done:"확인", fp:"오탐 처리" };
+const CHECK = { gone:"사라짐", deleted:"페이지 삭제됨", present:"아직 있음", unknown:"확인 못 함", skipped:"다시 점검으로 확인" };
+// 결과 파일의 시각은 UTC(+00:00)와 현지 시각이 섞여 있다. 화면에는 이 PC 의 현지 시각으로 맞춰 보인다
+function localTime(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d)) return String(iso || "").replace("T", " ").slice(0, 16);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+const shortTime = (iso) => localTime(iso).slice(5).replace("-", "/");
+// 유형 이름표에 마우스를 올리면 보이는 설명
+const TECH_DESC = {
+  HOMOGLYPH:"생김새가 비슷한 다른 문자(전각·키릴·수학 문자 등)로 바꿔 금칙어 필터를 피한 글",
+  JAMO:"ㅋㅏㅈㅣㄴㅗ 처럼 한글을 자음·모음으로 풀어 써 필터를 피한 글",
+  TRANSPARENT:"글자를 투명하게 하거나 배경과 같은 색으로 칠해 사람 눈에만 안 보이게 한 글",
+  OFFSCREEN:"화면 밖으로 밀어내거나, 크기·글자 크기를 0~1px로 줄이거나, 아예 표시하지 않게(display:none) 숨긴 글",
+};
+const EXTRA_DESC = {
+  VISIBLE_AD:"숨기지 않고 게시판·방명록·댓글에 그대로 올린 광고 글",
+  OCCLUDED:"다른 요소로 덮어 가린 광고",
+  META_SPAM:"페이지 제목·설명(메타 태그)에 넣은 광고. 화면에는 안 보여도 검색 결과에 뜹니다",
+  ATTR_SPAM:"그림 대체 글(alt) 같은 속성값에 숨긴 광고",
+  LINK_SPAM:"화면에 드러나지 않는 외부 도박·성인 사이트 링크",
+  CLOAKING:"검색엔진 로봇에게만 광고를 보여주는 조작",
+  ATTACHMENT_AD:"첨부파일(PDF·HWP·오피스 문서·zip·그림) 안에 넣은 광고",
+  IMAGE_TEXT_AD:"광고 문구를 그림으로 만들어 올린 것. 글자 인식(OCR)으로 읽었습니다",
+  SEARCH_REFLECT:"검색창이 입력한 글자를 그대로 되비춰, 광고 문구를 넣은 검색 주소가 구글에 올라갈 수 있는 상태",
+  SEARCH_INDEXED:"구글 등에 이미 올라간 주소에서 광고가 보이는 상태",
+  LINK_HIJACKED:"누리집이 걸어 둔 바깥 링크의 목적지가 광고 사이트로 바뀌었거나, 도메인이 만료되어 누구나 살 수 있는 상태",
+};
+function techDesc(f) {
+  if (f.technique === "ETC" && f.extra_finding) return EXTRA_DESC[f.extra_finding.split("(")[0]] || "";
+  return TECH_DESC[f.technique] || "";
+}
+
+
+/* ── 도움말 ── */
+const ONBOARD = `
+  <p class="lead">누리집 안에 숨겨지거나 몰래 올라간 불법광고(도박·성인·마약·대포통장 등)를 찾아 위치와 조치 방법을 알려 줍니다.</p>
+  <ol class="g-steps">
+    <li><b>주소 입력</b><p>첫 화면이나 게시판 주소를 넣고 [점검 시작]을 누릅니다. 운영 중인 누리집은 고급 설정의 '천천히 점검'을 켜십시오.</p></li>
+    <li><b>점검</b><p>기본 25분·최대 5000페이지씩 점검하며 시간을 선택할 수 있습니다. 시간이 되면 결과를 저장하고, 남은 작업은 이어서 점검할 수 있습니다.</p></li>
+    <li><b>결과 확인</b><p>요약 표와 광고 목록을 봅니다. 미확인 항목을 먼저 보이고, 확인·오탐 처리 항목은 아래 접힌 묶음에서 펼쳐 봅니다. 광고 문구나 [보기]를 누르면 상세 창이 열려 조치 방법·증거 사진·판정 정보를 볼 수 있고, 페이지 주소를 누르면 그 페이지가 새 창으로 열립니다.</p></li>
+  </ol>
+  <h3>처리 상태</h3>
+  <ul>
+    <li>처음에는 모두 <b>미확인</b>입니다. 목록의 처리 상태 칸이나 상세 창 맨 위에서 바꿉니다.</li>
+    <li>광고를 살펴봤으면 <b>확인</b>으로 바꿉니다. 확인한 광고 문구는 목록에서 흐린 글씨로 보입니다.</li>
+    <li>광고가 아닌 항목은 <b>오탐 처리</b>로 바꾸고 메모를 남깁니다. 다음 점검 때도 유지됩니다.</li>
+  </ul>
+  <h3>알아 두기</h3>
+  <ul>
+    <li>광고 수는 같은 광고를 한 번만 셉니다. 여러 페이지에 같은 위치·같은 문구로 든 광고는 '공통 서식' 한 줄로 묶습니다.</li>
+    <li>증거 사진은 숨김을 풀어 찍은 것이라 실제 화면과 다릅니다.</li>
+    <li>보고서 출력·엑셀(CSV)·점검·조치 이력은 결과 목록 위 오른쪽 단추로 엽니다.</li>
+  </ul>`;
+function showGuide() { $("guidebody").innerHTML = ONBOARD; $("guide").showModal(); }
+
+/* ── 화면 단계 ── */
+let DATA = { findings: [], meta: null };
+let poll = null, quitting = false, ticking = false;
+// view: 결과 목록(list) 또는 광고 하나의 상세(detail). selKey 는 상세에서 보는 항목 키
+let view = "list", selKey = null, selIdx = 0, ENTRIES = [], listScroll = 0, refocus = null;
+// 기본 화면은 미확인만 보이고, 오탐 처리·확인는 목록 아래 접힌 묶음(REST)에 둔다. 펼치면 ENTRIES 뒤에 이어 붙는다
+let REST = [], restOpen = false, mainCount = 0, baseStatus = "all";   // baseStatus: 결과를 열 때 정한 기본 처리 상태 조건
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+  (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+function setStep(n) {
+  document.querySelectorAll("#steps li").forEach((li) => {
+    const s = Number(li.dataset.s);
+    li.className = s < n ? "done" : s === n ? "now" : "";
+    if (s === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+  });
+}
+// 키워드 화면에서 돌아갈 화면과 그 단추 이름
+const KW_BACK = { start:"← 주소 입력으로", running:"← 점검 화면으로", result:"← 점검 결과로", search:"← 추가 탐색으로" };
+let kwBack = "start";
+function setStage(stage, leaving) {
+  // 키워드 화면을 보는 동안 점검이 끝나 결과 화면으로 가야 하는 등은 화면을 빼앗지 않고 돌아갈 곳만 바꾼다
+  if ($("app").dataset.stage === "keywords" && stage !== "keywords" && !leaving) {
+    kwBack = stage;
+    $("kwback").textContent = KW_BACK[stage] || "← 돌아가기";
+    return;
+  }
+  $("app").dataset.stage = stage;
+  $("start").hidden = stage !== "start";
+  $("running").hidden = stage !== "running";
+  $("body").hidden = stage !== "result";
+  $("searchstage").hidden = stage !== "search";
+  $("kwstage").hidden = stage !== "keywords";
+  $("steps").hidden = stage === "keywords";
+  $("kwbar").hidden = stage !== "keywords";
+  if (stage === "keywords") $("kwbtn").setAttribute("aria-current", "page"); else $("kwbtn").removeAttribute("aria-current");
+  if (stage === "keywords") return;
+  setStep(stage === "start" ? 1 : stage === "running" ? 2 : 3);
+  if (stage === "start") {
+    renderRuns();                               // 지난 점검 결과를 모두 보이고 골라 열 수 있게
+    refreshExclusions().catch(() => {});
+    $("url").focus();
+  }
+}
+
+// 확인 창. 고르면 true, 취소·Esc 는 false. 창이 열려 있으면 닫힌 뒤 차례로 연다
+let asking = Promise.resolve();
+function ask(message, { title = "확인", ok = "확인", cancel = "취소", danger = false } = {}) {
+  const show = () => new Promise((resolve) => {
+    const d = $("askdlg");
+    $("askh").textContent = title;
+    $("askmsg").textContent = message;
+    $("askok").textContent = ok;
+    $("askok").className = "btn " + (danger ? "danger" : "primary");
+    $("askcancel").textContent = cancel || "";
+    $("askcancel").hidden = !cancel;
+    d.returnValue = "";
+    d.addEventListener("close", () => resolve(d.returnValue === "ok"), { once: true });
+    d.showModal();
+    // 되돌릴 수 없는 일은 취소에 초점을 둔다
+    (cancel ? $("askcancel") : $("askok")).focus();
+  });
+  const run = asking.then(show);
+  asking = run.catch(() => {});
+  return run;
+}
+const tell = (message, title = "알림") => ask(message, { title, cancel: null });
+
+async function refreshExclusions() {
+  const data = await api("/api/exclusions");
+  const rules = data.exclusions || [];
+  $("exclusionsbtn").textContent = `점검 제외 목록${rules.length ? ` (${rules.length})` : ""}`;
+  $("exclusionshint").textContent = rules.length
+    ? `저장된 점검 제외 주소 ${rules.length}건이 다음 점검에 적용됩니다. 위쪽 [점검 제외 목록]에서 확인하거나 해제할 수 있습니다.`
+    : "오탐을 직접 확인한 주소는 결과 상세에서 다음 점검 대상에서 제외할 수 있습니다.";
+  $("exclusionslist").innerHTML = rules.length ? rules.map((r, i) =>
+    `<li><p><b>${esc(r.url)}</b></p><p>${esc(r.reason)}</p><p class="help">등록: ${esc(localTime(r.created_at))}</p>
+    <button type="button" class="btn sm" data-remove-exclusion="${i}">제외 해제</button></li>`).join("")
+    : "<li>제외한 주소가 없습니다.</li>";
+  $("exclusionslist").querySelectorAll("[data-remove-exclusion]").forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await api("/api/exclusions", {method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({action:"remove", url:rules[Number(b.dataset.removeExclusion)].url})});
+        await refreshExclusions();
+        if ($("app").dataset.stage === "result") await load();
+        announce("제외를 해제했습니다. 다음 점검부터 다시 검사합니다.");
+      } catch (err) { $("exclusionserr").textContent = err.message; b.disabled = false; }
+    };
+  });
+}
+$("exclusionsbtn").onclick = async () => {
+  $("exclusionserr").textContent = "";
+  $("exclusionsdlg").showModal();
+  try { await refreshExclusions(); }
+  catch (err) { $("exclusionserr").textContent = err.message; }
+};
+
+// 낱말 끝 글자에 받침이 있으면 a(을·은·이), 없으면 b(를·는·가). 한글이 아니면 받침 없음으로 본다
+function josa(word, a, b) {
+  const c = String(word || "").trim().slice(-1).charCodeAt(0);
+  return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 ? a : b;
+}
+
+// 걸린 시간: 60초 미만은 '12.3초', 그 뒤로는 '1분 05초'
+function duration(sec) {
+  const n = Math.round((Number(sec) || 0) * 10) / 10;     // 59.96초가 '60초'로 보이지 않게 먼저 반올림한다
+  if (n < 60) return `${n}초`;
+  const whole = Math.floor(n);
+  return `${Math.floor(whole / 60)}분 ${String(whole % 60).padStart(2, "0")}초`;
+}
+
+const LOST = "훤히 프로그램과 연결이 끊어졌습니다. 창을 닫고 훤히를 다시 실행해 주십시오.";
+async function api(path, opts) {
+  let r;
+  // 뒤에서 돌던 훤히가 꺼졌으면 브라우저는 'Failed to fetch' 만 알려 준다. 담당자가 할 일을 알려 준다
+  try { r = await fetch(path, opts); } catch (e) { throw new Error(LOST); }
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r.json();
+}
+function guideFor(f) {
+  if ((f.judgement || {}).decision === "review") return ["광고 근거가 부족한 경계 항목입니다. 원문과 연락처·주소의 용도를 확인하십시오. 제출용 위반 항목에서는 제외됩니다."];
+  if (!f.guide) return GUIDE[f.technique] || [];
+  if (!(f.extra_finding || "").startsWith("SEARCH_REFLECT")) return [f.guide];
+  return [f.guide, "이미 색인된 검색 주소가 있는지 Search Console 에서 확인하고, 있으면 삭제를 요청합니다. "
+    + "시작 화면 '고급 설정'의 색인 목록에 내려받은 목록을 넣으면 한꺼번에 확인할 수 있습니다."];
+}
+function techLabel(f) {
+  if (f.technique === "ETC" && f.extra_finding) {
+    return f.extra_finding.replace(/^[A-Z_]+\(/, "").replace(/\)$/, "");
+  }
+  return TECHS[f.technique] || f.technique;
+}
+
+/* ── 점검 ── */
+$("go").addEventListener("click", async () => {
+  if ($("go").disabled) return;
+  $("starterr").hidden = true;
+  $("go").disabled = true;              // 두 번 눌러도 한 번만 보낸다
+  try {
+    await api("/api/scan", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ url:$("url").value, max_pages:Number($("maxp").value) || 5000, time_minutes:Number($("scan-minutes").value),
+                             extra_types:$("extra-types").checked, capture:$("capture").checked, snapshots:$("snapshots").checked,
+                             cloaking:$("cloaking").checked, attachments:$("attach").checked,
+                             search_reflect:$("reflect").checked, subdomains:$("subdomains").checked,
+                             polite:$("polite").checked, check_links:$("links").checked,
+                             ocr_images:$("ocrimg").checked,
+                             index_csv:indexCsv }) });
+    startRunning($("url").value);
+  } catch (e) { $("go").disabled = false; showStartError(e.message); }
+});
+$("url").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("go").click(); });
+function startRunning(url) {
+  $("go").disabled = true;
+  $("stop").disabled = false;
+  $("stop").textContent = "점검 중지";
+  $("runurl").textContent = url || "-";
+  $("runmsg").textContent = "누리집을 여는 중입니다";
+  showCounts({}, 0, 0, 0);
+  $("runlost").hidden = true;
+  document.querySelector("#running .prog").classList.remove("off");
+  view = "list";
+  announce("점검을 시작했습니다.");
+  setStage("running");
+  poll = setInterval(tick, 250);
+}
+async function resumeScan(runId, minutes=25, entryUrl='') {
+  try {
+    await api('/api/scan/resume', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({run_id:runId, time_minutes:minutes})});
+    startRunning(entryUrl || (DATA.meta || {}).entry_url);
+  } catch (e) { await tell(e.message); }
+}
+// 이어서 점검할 시간은 시작 화면 '고급 설정'의 점검 시간을 따른다 (지난 점검 목록의 [이어서 점검]과 같다)
+$('resume-scan').addEventListener('click', () => resumeScan(DATA.meta.run_id, Number($('scan-minutes').value)));
+$("again").addEventListener("click", () => {
+  // 지금 보고 있는 결과의 주소로 다시 점검한다. 다른 결과를 열기 전에 넣어 둔 주소가 남지 않게 한다
+  const u = (DATA.meta || {}).entry_url;
+  if (u) $("url").value = u;
+  setStage("start");
+});
+// 결과 화면에서 고른 경우에만 검색엔진 추가 탐색 단계로 간다. 지금 보는 결과의 도메인과 낱말로 미리 채운다
+function entryHost() {
+  try { return new URL((DATA.meta || {}).entry_url).host; } catch (e) { return ""; }
+}
+function suggestedTerms(limit = 5) {
+  const n = new Map();
+  DATA.findings.forEach((f) => ((f.judgement || {}).terms || []).forEach((w) => n.set(w, (n.get(w) || 0) + 1)));
+  return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([w]) => w);
+}
+let searchFor = null;      // 미리 채운 결과(진입 주소). 다른 결과를 열면 다시 채운다
+$("search-open").addEventListener("click", () => {
+  const entry = (DATA.meta || {}).entry_url || "";
+  if (searchFor !== entry) {
+    searchFor = entry;
+    $("search-site").value = entryHost();
+    // 점검에서 찾은 단어는 직접 입력칸이 아니라 '찾은 단어' 선택으로 넣는다
+    const terms = suggestedTerms();
+    $("search-terms").value = "";
+    $("search-found").dataset.terms = JSON.stringify(terms);
+    $("search-found").checked = true;
+    $("search-foundrow").hidden = !terms.length;
+    $("search-foundwords").textContent = terms.length ? "(" + terms.join(", ") + ")" : "";
+    $("search-fields").dispatchEvent(new Event("change"));
+  }
+  setStage("search");
+  $("searchstage").scrollTop = 0;
+  $("search-site").focus();
+});
+$("search-back").addEventListener("click", () => { setStage("result"); $("search-open").focus(); });
+/* ── 지난 점검 목록 ── */
+const runWhen = (r) => localTime(r.finished);
+async function renderRuns() {
+  let runs = [];
+  try { runs = (await api("/api/runs")).runs; } catch (e) { /* 서버가 아직 준비되지 않았으면 목록 없이 둔다 */ }
+  $("runsbox").hidden = !runs.length;
+  $("runscount").textContent = runs.length ? `${runs.length}건` : "";
+  // 최근 점검이 맨 위라 '최근' 표시는 따로 두지 않는다. 결과 확인 단계에서 열리는 결과만 표시한다
+  $("runlist").innerHTML = runs.map((r) => {
+    const tags = (r.current ? '<span class="lbl-tag dark">최근 본 기록</span>' : "")
+      + (!r.page_count ? '<span class="lbl-tag warn">점검하지 못함</span>'
+        : partialTags(r.stopped, r.left_count, r.failed_count).map((t) => `<span class="lbl-tag">${esc(t)}</span>`).join(""));
+    return `<li${r.current ? ' class="cur"' : ""}><div class="ri">
+        <div class="rt"><b>${esc(runWhen(r))}</b>${tags}<span>페이지 ${r.page_count}건 · 의심 항목 ${r.count}건 · ${r.session_number || 1}회차</span></div>
+        <span class="ru" title="${esc(r.entry_url)}">${esc(r.entry_url)}</span></div>
+      ${r.can_resume ? `<button class="btn sm" type="button" data-resume="${esc(r.run_id)}" data-entry="${esc(r.entry_url)}">이어서 점검</button>` : ''}
+      <button class="btn sm" type="button" data-open="${esc(r.run_id)}" aria-label="${esc(runWhen(r))} 점검 결과 보기">결과 보기</button>
+      <button class="btn sm del" type="button" data-del="${esc(r.run_id)}" data-when="${esc(runWhen(r))}" aria-label="${esc(runWhen(r))} 점검 결과 삭제">삭제</button></li>`;
+  }).join("");
+}
+$("runlist").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-open], button[data-del], button[data-resume]");
+  if (!b || b.disabled) return;
+  const post = (path, run_id) => api(path, { method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ run_id }) });
+  if (b.dataset.resume) { await resumeScan(b.dataset.resume, Number($('scan-minutes').value), b.dataset.entry); return; }
+  if (b.dataset.open) {
+    b.disabled = true;
+    try { await post("/api/runs/open", b.dataset.open); view = "list"; await load(); }
+    catch (e) { tell(e.message); b.disabled = false; }
+    return;
+  }
+  if (!(await ask(`${b.dataset.when} 점검 결과를 삭제할까요?\n증거 사진과 페이지 사본도 함께 지워지며 되돌릴 수 없습니다.`,
+                  { title:"점검 결과 삭제", ok:"삭제", danger:true }))) return;
+  b.disabled = true;
+  try {
+    const r = await post("/api/runs/delete", b.dataset.del);
+    // 보던 결과를 지웠으면 서버가 남은 것 중 최근 점검으로 바꿨다. 화면 자료도 맞춘다
+    if ((DATA.meta || {}).run_id === b.dataset.del) {
+      if (r.has_result) DATA = await api("/api/result");
+      else { DATA = { findings: [], meta: null }; $("st-left").textContent = "대기 중"; setArchivePath(""); }
+    }
+    await renderRuns();
+    notify("점검 결과를 삭제했습니다.");
+    const next = $("runlist").querySelector("button[data-open]");
+    (next || $("url")).focus();
+  } catch (e) { tell(e.message); b.disabled = false; }
+});
+/* ── 색인 목록(Search Console CSV) ── */
+let indexCsv = null;
+$("idxbtn").addEventListener("click", () => {
+  if (indexCsv) {                     // 넣은 목록을 한 번 더 누르면 뺀다
+    indexCsv = null; $("idxfile").value = "";
+    $("idxbtn").textContent = "목록 파일 고르기"; $("idxbtn").classList.remove("on");
+    return;
+  }
+  $("idxfile").click();
+});
+$("idxfile").addEventListener("change", async () => {
+  const file = $("idxfile").files[0];
+  if (!file) return;
+  // 인코딩(UTF-8/CP949)은 서버에서 판별하도록 원본 바이트를 그대로 보낸다
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  indexCsv = btoa(bin);
+  $("idxbtn").textContent = `색인 목록: ${file.name} ✕`;
+  $("idxbtn").classList.add("on");
+});
+
+// info 가 참이면 오류가 아닌 안내(회색 상자)로 보인다
+function showStartError(msg, info) {
+  $("starterrmsg").textContent = msg;
+  $("starterr").classList.toggle("err", !info);
+  $("starterr").hidden = false;
+}
+// 점검 중 훤히와 연결이 끊기면 진행 표시를 멈추고 할 일을 알린다 (그대로 두면 진행 중처럼 보인다)
+function showLost(msg) {
+  clearInterval(poll);
+  $("runlostmsg").textContent = msg;
+  $("runlost").hidden = false;
+  $("runmsg").textContent = "연결이 끊어져 진행 상황을 알 수 없습니다";
+  document.querySelector("#running .prog").classList.add("off");
+  $("stop").disabled = true;
+  $("stop").textContent = "연결 끊김";
+  $("st-left").textContent = "연결 끊김";
+  announce(msg);
+}
+const STOPPING = "중지 요청을 처리하고 마지막 결과를 저장하는 중입니다";
+// 진행 숫자 칸. 대기 중인 주소는 지금까지 찾은 주소라 탐색하면서 늘었다 줄었다 한다
+function showCounts(d, done, elapsed, limit) {
+  $("rc-done").textContent = (done || 0).toLocaleString();
+  $("rc-pending").textContent = (d.pending || 0).toLocaleString();
+  $("rc-found").innerHTML = `${(d.found || 0).toLocaleString()}<small>건</small>`;
+  $("rc-found").parentElement.classList.toggle("hot", (d.found || 0) > 0);
+  $("rc-time").innerHTML = esc(duration(elapsed)) + (limit ? `<small class="lim">/ ${Math.round(limit / 60)}분</small>` : "");
+  $("runfail").hidden = !d.failed_count;
+  $("runfail").textContent = d.failed_count ? `열지 못한 페이지 ${d.failed_count}건` : "";
+}
+async function tick() {
+  if (quitting || ticking) return;
+  ticking = true;
+  try {
+    const s = await api("/api/status");
+    if (quitting) return;
+    $("st-left").textContent = `점검 중 · 분석 완료 ${s.pages_done}건 · ${duration(s.elapsed)}`;
+    setArchivePath("");
+    const d = s.detail || {};
+    showCounts(d, s.pages_done, s.elapsed, s.time_limit);
+    // 첫 페이지가 열리기 전(브라우저 준비 중)에는 지금 보는 페이지 대신 준비 중임을 알린다
+    if (s.pages_done || d.visited) {
+      $("runmsg").innerHTML = `<b>지금 보는 페이지</b>${esc(s.current || "-")}`;
+      $("runmsg").title = s.current || "";
+    } else $("runmsg").textContent = "브라우저를 준비하고 첫 페이지를 여는 중입니다";
+    if (s.stopping && $("runmsg").textContent !== STOPPING) announce("점검을 멈추는 중입니다.");
+    if (s.stopping) $("runmsg").textContent = STOPPING;
+    if (s.running) return;
+    clearInterval(poll);
+    $("go").disabled = false;
+    if (s.error) {
+      $("st-left").textContent = "오류";
+      setStage("start");
+      return showStartError("점검 중 오류 — " + s.error);
+    }
+    if (s.notice) {                    // 시작 직후 중지: 되살린 지난 결과를 이번 결과로 보이지 않는다
+      $("st-left").textContent = "점검 중지 · 저장한 결과 없음";
+      setStage("start");
+      announce(s.notice);
+      return showStartError(s.notice, true);
+    }
+    if (s.has_result) {
+      await load();
+      const m = DATA.meta || {}, tags = m.page_count ? partialTags(m.stopped, m.coverage?.left_count, m.coverage?.failed_count) : [];
+      announce(`점검이 끝났습니다${tags.length ? `(${tags.join(", ")})` : ""}. 검토가 필요한 의심 항목 ${entries(DATA.findings).length}건이 있습니다.`);
+    }
+  } catch (e) {
+    if (!quitting) showLost(e.message);
+  } finally {
+    ticking = false;
+  }
+}
+// 이번 점검에서 검사한 항목. 꺼 둔 추가 검사의 광고는 0건이어도 없는 것이 아니라 보지 않은 것이다 (옛 결과는 알 수 없어 숨긴다)
+const CHECK_NAME = { extra:"추가 광고 유형", attachments:"첨부파일", ocr_images:"그림 속 글자", cloaking:"크롤러 위장",
+                     search_reflect:"검색창", check_links:"연계 링크" };
+function checkScope(on) {
+  if (!on) return "";
+  const off = Object.keys(CHECK_NAME).filter((k) => !on.includes(k)).map((k) => CHECK_NAME[k]);
+  const head = "검사 항목: 기본 4종(닮은꼴 글자·자모 분해·투명 텍스트·화면 밖 은닉)" + (on.length ? ` + ${on.map((k) => CHECK_NAME[k]).join("·")}` : "");
+  return off.length ? `${head}. ${off.join("·")} 검사는 고급 설정의 '추가 검사'에서 켜야 동작합니다.` : `${head}.`;
+}
+async function load(stay) {
+  DATA = await api("/api/result");
+  const m = DATA.meta || {};
+  const when = localTime(m.finished_at);
+  // 다른 점검 결과로 바뀌면 앞 결과에서 걸어 둔 검색 조건을 푼다 (요약과 목록 건수가 어긋나 보이지 않게)
+  if (m.run_id !== shownRun) { shownRun = m.run_id; resetFilters(); }
+  const partial = m.stopped || m.coverage?.left_count || m.coverage?.failed_count || m.save_error;
+  const stop = partialTags(m.stopped, m.coverage?.left_count, m.coverage?.failed_count).map((t) => ` · ${t}`).join("");
+  $("st-left").textContent = `${stay ? "지난 결과" : partial ? "부분 결과" : "완료"} · 페이지 ${m.page_count}건 · ${duration(m.elapsed_sec)}${stop}`;
+  setArchivePath(m.archive_dir || m.out_dir || "");
+  $("topurl").textContent = m.entry_url || "";
+  $("topmeta").textContent = `${when} · 페이지 ${m.page_count}건 · 이번 ${duration(m.elapsed_sec)} · 총 ${duration(m.total_elapsed ?? m.elapsed_sec)} / ${m.session_number || 1}회${stop}`;
+  const scope = checkScope(m.checks_on);
+  $("checkscope").hidden = !scope;
+  $("checkscope").textContent = scope;
+  $('resume-scan').hidden = !m.can_resume;
+  if (!$("url").value) $("url").value = m.entry_url || "";   // [다시 점검] 때 같은 주소를 바로 다시 쓸 수 있게
+  // 프로그램을 다시 켰을 때는 시작 화면에 두고, 지난 결과로 갈 수 있는 단추만 보인다
+  if (stay) return setStage("start");
+  setStage("result");
+  render();
+}
+
+/* ── 검색 조건 ── */
+let shownRun;
+// 처리할 일이 남아 있으면 미확인만 보이는 것이 기본이다. 미확인가 없으면 빈 목록이 되지 않게 전체를 보인다
+function defaultStatus() {
+  return entries(DATA.findings).some((e) => entryStatus(e) === "open") ? "open" : "all";
+}
+function resetFilters() {
+  $("q").value = ""; baseStatus = $("statusf").value = defaultStatus(); $("levelf").value = "all"; $("newonly").checked = false;
+  restOpen = false;
+}
+$("clearf").addEventListener("click", () => { resetFilters(); render(); $("q").focus(); });
+// 처리 상태는 광고(목록 한 줄) 단위로 거른다. 한 광고에 수법이 여럿이면 상태도 함께 바꾼다
+// 먼저 전체 항목을 광고로 묶고, 표시 여부만 거른다. 숨긴 수법·페이지도 상태와 메모를 함께 저장한다.
+const pool = () => entries([...DATA.findings].sort((a, b) => urgency(a) - urgency(b)));
+function matches(e) {
+  const q = $("q").value.trim().toLowerCase(), lv = $("levelf").value;
+  return e.rows.some((f) => (!q || (f.evidence_text + showUrl(f.url) + f.location + f.normalized).toLowerCase().includes(q))) &&
+    (!$("newonly").checked || e.rows.some((r) => r.is_new)) &&
+    (lv === "all" || levelGroup((entryLevel(e) || {}).level) === lv);
+}
+function visible() {
+  const st = $("statusf").value;
+  return pool().filter((e) => matches(e) &&
+    (st === "all" || (st === "new" ? e.rows.some((r) => r.is_new) : entryStatus(e) === st)));
+}
+// 미확인 화면에서 접어 두는 오탐 처리·확인 항목. 검색어·유형·등급 조건은 그대로 적용한다
+function restEntries() {
+  return $("statusf").value === "open" ? pool().filter((e) => matches(e) && entryStatus(e) !== "open") : [];
+}
+// 판정 등급(확실·의심·경계). 한 광고에 묶인 항목 중 가장 강한 등급으로 본다. 등급이 없는 검사(연계 링크 등)는 null
+const LEVEL_RANK = { high:4, mid:3, low:2, review:1 };
+function entryLevel(e) {
+  const confirmed = e.rows.some((r) => (r.judgement || {}).decision !== "review");
+  return e.rows.map((r) => r.judgement).filter((j) => j && LEVEL_RANK[j.level])
+    .filter((j) => !confirmed || j.decision !== "review")
+    .sort((a, b) => LEVEL_RANK[b.level] - LEVEL_RANK[a.level])[0] || null;
+}
+// 광고 근거가 부족한 항목(review)도 '경계'로 보이되 제출에서 빠짐을 함께 적는다. 옛 결과의 '검토 후보'도 같은 이름으로 보인다
+const LEVEL_NAME = { high:"확실", mid:"의심", low:"경계", review:"경계 · 제출 제외" };
+const levelGroup = (lv) => lv === "review" ? "low" : lv;
+const levelHtml = (j) => j ? `<span class="lv ${esc(j.level)}" title="판정 등급">${esc(LEVEL_NAME[j.level] || j.label)}</span>` : "";
+// 한 광고에 묶인 항목의 처리 상태가 갈리면(지난 기록 등) 남은 일이 있는 쪽으로 본다
+function entryStatus(e) {
+  const s = new Set(e.rows.map((r) => r.status));
+  return s.has("open") ? "open" : s.has("done") ? "done" : "fp";
+}
+// 실제 노출 중인 광고를 먼저, 악용 가능성(취약·주의)은 뒤에 보인다
+const urgency = (f) => ({ "취약": 1, "주의": 2 }[f.grade] || 0);
+const LEVEL_HELP = { review:"광고 근거가 부족해 제출용 위반 항목에서는 제외한 경계 항목입니다. 원문과 문맥을 확인하십시오.", high:"광고 근거가 뚜렷합니다. 바로 조치하십시오.",
+                     mid:"광고로 판정했지만 근거가 한쪽뿐입니다. 원문을 보고 조치하십시오.",
+                     low:"판정 기준을 겨우 넘었거나 일부만 광고로 판정했습니다. 오탐인지 먼저 확인하십시오." };
+// 증거 사진·원본 코드·페이지 사본은 고급 설정에서 켠 점검에만 남는다. 비어 있을 때 오류로 오해하지 않게 까닭을 적는다
+// 이번 점검의 설정: true 켬 · false 끔 · null 옛 결과라 알 수 없음
+const savedOption = (kind) => ((DATA.meta || {}).saved || {})[kind] ?? null;
+const NOT_SAVED = {
+  evidence: { need:"증거 사진은 고급 설정의 '검출 증거 사진 저장'을 켜고 점검해야 저장됩니다.",
+              failed:"이 항목은 사진을 찍지 못했습니다. 점검 중 요소가 사라졌거나 크기가 없는 요소일 수 있습니다." },
+  code: { need:"원본 코드는 고급 설정의 '검출 증거 사진 저장'을 켜고 점검해야 저장됩니다", failed:"원본을 가져오지 못했습니다" },
+  snapshots: { need:"누리집 화면 사본은 고급 설정의 '방문 페이지 사본 저장'을 켜고 점검해야 저장됩니다." },
+};
+function notSaved(kind) {
+  return NOT_SAVED[kind][savedOption(kind === "code" ? "evidence" : kind) ? "failed" : "need"];
+}
+// 색인 목록 주소는 한글 검색어가 %EC.. 로 인코딩되어 있어 사람이 읽을 수 있게 풀어 보인다
+function showUrl(u) {
+  try { return decodeURIComponent(u.replace(/\+/g, " ")); } catch (e) { return u; }
+}
+// 주소에서 기관 도메인을 뺀 경로만 (목록 칸을 짧게)
+function shortUrl(u) {
+  try { const x = new URL(u); return decodeURIComponent(x.pathname + x.search) || "/"; } catch (e) { return showUrl(u); }
+}
+// 메뉴·하단·위젯처럼 모든 페이지가 함께 쓰는 공통 서식에 든 광고는 페이지마다 같은 위치·같은 문구로
+// 잡힌다. 결과 파일(result.json)에는 요강대로 페이지마다 적되, 화면에서는 한 줄로 묶어 보인다.
+const SHARED_MIN = 3;
+function sharedGroups(rows) {
+  const m = new Map();
+  rows.forEach((r) => {
+    const k = r.technique + "\u0000" + r.location + "\u0000" + r.evidence_text;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(r);
+  });
+  return [...m.values()].filter((g) => new Set(g.map((r) => r.url)).size >= SHARED_MIN);
+}
+// 목록 한 줄 = 광고 하나. 공통 서식 묶음 먼저, 그다음 페이지 순서대로.
+// 같은 페이지·같은 위치에 든 항목은 숨긴 수법이 여럿이어도 한 광고로 묶는다 (요약·보고서의 광고 수와 같은 기준).
+// rows 는 줄에 묶인 모든 항목, same 은 공통 서식 묶음일 때만 있다. 공통 서식 묶음은 첫 항목 키에 's:' 를 붙인다
+function entries(rows) {
+  const shared = sharedGroups(rows), inShared = new Set(shared.flat()), out = [];
+  shared.forEach((same) => out.push({ key:"s:" + same[0].key, f:same[0], same, rows:same }));
+  const rest = rows.filter((r) => !inShared.has(r));
+  [...new Set(rest.map((r) => r.url))].forEach((url) => {
+    const at = new Map();
+    rest.filter((r) => r.url === url).forEach((r) => {
+      if (!at.has(r.location)) at.set(r.location, []);
+      at.get(r.location).push(r);
+    });
+    at.forEach((g) => out.push({ key:g[0].key, f:g[0], same:null, rows:g }));
+  });
+  return out;
+}
+// 한 광고에 숨긴 수법이 여럿이면 함께 보인다
+const entryLabel = (e) => [...new Set(e.rows.map(techLabel))].join(" · ");
+
+/* ── 그리기 ── */
+function render() {
+  renderSummary();
+  const n = notices();
+  $("notices").innerHTML = n ? `<div class="alert"><div>${n}</div></div>` : "";
+  const part = partialInfo();
+  $("ptag").hidden = !part;
+  $("partialnote").hidden = !part;
+  $("partialtext").innerHTML = part || "";
+  const none = !DATA.findings.length;
+  $("newonlybox").hidden = !DATA.findings.some((f) => f.is_new);   // 지난 점검과 견줄 때만
+  $("searchcta").hidden = !(DATA.meta || {}).entry_url;
+  // 의심 항목이 없어도 정상 점검 결과를 업무 기록으로 남길 수 있게 보고서·CSV·이력 단추는 둔다
+  $("searchbox").hidden = none; $("grid").hidden = none; $("total").hidden = none;
+  $("emptyall").hidden = !none;
+  if (none) {
+    view = "list";
+    $("clearf").hidden = true;
+    $("emptyall").innerHTML = !(DATA.meta || {}).page_count
+      ? '<b>점검하지 못했습니다</b>진입 주소가 열리지 않아 한 페이지도 보지 못했습니다. 위 안내의 사유를 확인하고 다시 시도하십시오.'
+      : part
+        ? '<b>점검한 범위에서 의심 항목을 찾지 못했습니다</b>일부만 점검한 결과입니다. 맨 위 \'부분 점검 결과\' 안내에서 점검하지 못한 주소와 다시 점검하는 방법을 확인하십시오.'
+        : '<b>점검한 범위에서 의심 항목을 찾지 못했습니다</b>점검이 끝났습니다. 결과 파일은 아래 표시된 폴더에 저장되었습니다.';
+  }
+  const main = none ? [] : visible();
+  REST = none ? [] : restEntries();
+  mainCount = main.length;
+  // 상세에서 오탐 처리한 광고는 접힌 묶음으로 옮겨 가는데, 보던 상세가 갑자기 닫히지 않게 묶음을 펼친 채로 둔다
+  if (view === "detail" && REST.some((e) => e.key === selKey)) restOpen = true;
+  ENTRIES = restOpen ? main.concat(REST) : main;
+  // 상세에서 처리 상태를 바꿔 거르기 조건에서 빠지면 다음 광고로 넘어간다. 남은 광고가 없으면 목록으로
+  if (view === "detail" && !ENTRIES.some((e) => e.key === selKey)) {
+    if (ENTRIES.length) selKey = ENTRIES[Math.min(selIdx, ENTRIES.length - 1)].key; else view = "list";
+  }
+  // 목록은 늘 보이고, 상세는 그 위에 팝업으로 연다
+  $("listview").hidden = false;
+  const dlg = $("detaildlg");
+  if (view === "detail") { if (!dlg.open) dlg.showModal(); } else if (dlg.open) dlg.close();
+  setStep(3);
+  if (!none) renderRows();
+  if (view === "detail") renderDetail();
+}
+
+function renderSummary() {
+  const m = DATA.meta || {}, h = m.history, rc = m.recheck;
+  // 목록과 같은 단위(광고 하나 = 한 줄)로 센다. 미확인·확인·오탐 처리를 더하면 의심 항목 수가 된다
+  const all = entries(DATA.findings), by = (st) => all.filter((e) => entryStatus(e) === st).length;
+  const left = by("open");
+  // 조치 확인 시각은 제목이 아니라 숫자 옆에 작게 둔다 (제목이 길어져 두 줄이 되지 않게)
+  const candidates = all.filter((e) => (entryLevel(e) || {}).level === "review").length;
+  const cells = [["의심 항목", all.length, "건", all.length ? "hot" : ""],
+    [rc ? "남은 의심 항목" : "미확인", left, "건", left ? "hot" : "", rc ? `${shortTime(rc.at)} 확인` : ""],
+    ["확인", by("done"), "건", ""],
+    ["오탐 처리", by("fp"), "건", ""]]
+    .concat(candidates ? [["광고 판정", all.length - candidates, "건", ""], ["경계 · 제출 제외", candidates, "건", ""]] : [])
+    .concat(h ? [["지난 점검 뒤 새로 생김", all.filter((e) => e.rows.some((r) => r.is_new)).length, "건", ""], ["지난 점검 뒤 사라짐", h.gone_count, "건", ""]] : []);
+  $("sumgrid").innerHTML = "<dl>" + cells.map(([k, v, u, cls, note]) =>
+    `<div class="${cls}"><dt title="${esc(k)}">${esc(k)}</dt><dd>${v}<small>${u}</small>${
+      note ? `<span class="note">${esc(note)}</span>` : ""}</dd></div>`).join("") + "</dl>";
+}
+
+const STOP_NOTE = { budget:"이번 회차의 추가 검사 한도에 도달했습니다. 미완료 작업을 저장했습니다.", interrupted:"완료가 확인되지 않은 실행의 중간 저장 기록입니다.", stalled:"진행이 정체되어 작업을 종료했습니다. 마지막 저장까지의 부분 결과입니다.", user:"점검을 중지해 일부 페이지만 점검한 결과입니다.",
+                    time:"이번 회차의 점검 시간에 도달해 현재까지의 결과를 저장했습니다.",
+                    blocked:"페이지가 잇달아 열리지 않아 점검을 멈췄습니다. 서버가 요청을 막았거나 접속 장애가 의심됩니다. 누리집 담당자에게 점검 사실을 알리고 [천천히 점검]으로 다시 점검하십시오." };
+/* 끝까지 점검하지 못한 이유를 짧은 표시로. 멈춘 이유가 있으면 그것을, 없으면 페이지 한도를 보이고, 열지 못한 페이지 수를 덧붙인다 */
+const STOP_TAG = { budget:"추가 검사 대기", user:"중지함", time:"시간 초과로 중단", blocked:"접속 막혀 중단", stalled:"중간에 끊김", interrupted:"중간에 끊김" };
+function partialTags(stopped, left, failed) {
+  const tags = [];
+  if (stopped) tags.push(STOP_TAG[stopped] || "중간에 끊김");
+  else if (left) tags.push("페이지 한도 도달");
+  if (failed) tags.push(`못 연 페이지 ${failed}건`);
+  return tags;
+}
+/* 부분 점검: 제목 옆 표시와 함께, 무엇을 못 봤고 어떻게 다시 점검하는지 한곳에서 알린다. 다 봤으면 null */
+function partialInfo() {
+  const m = DATA.meta || {}, c = m.coverage || {};
+  if (!(m.stopped || c.left_count || c.failed_count || m.can_resume)) return null;
+  const why = [], how = [];
+  if (!m.can_resume && m.resume_reason) how.push(esc(m.resume_reason));
+  if (m.can_resume) how.push('[이어서 점검]을 누르면 완료한 페이지는 건너뛰고 남은 작업부터 진행합니다. 이미 저장되어 있어 프로그램을 종료해도 지난 기록에서 이어갈 수 있습니다.');
+  if (m.pending_extra) why.push(`남은 추가 검사 <b>${m.pending_extra}건</b>이 있습니다.`);
+  if (m.stopped) why.push(esc(STOP_NOTE[m.stopped] || "점검을 끝까지 마치지 못했습니다."));
+  if (c.left_count) {
+    why.push(m.stopped ? `찾았지만 열지 않은 주소가 <b>${c.left_count}건</b> 있습니다.`
+      : `최대 페이지 수(${esc(c.max_pages)})에 닿아 주소 <b>${c.left_count}건</b>을 열지 않았습니다.`);
+    if (!m.can_resume) how.push(m.stopped ? "[다시 점검]으로 처음부터 다시 점검하십시오."
+      : "[다시 점검]에서 '고급 설정'의 최대 페이지 수를 늘리거나, 남은 게시판 주소를 따로 넣어 점검하십시오.");
+  }
+  if (c.failed_count) {
+    why.push(`페이지 <b>${c.failed_count}건</b>은 열지 못했거나 끝까지 읽지 못했습니다.`);
+    how.push("'천천히 점검'을 켜고 다시 점검하십시오.");
+  }
+  return `<p><b>부분 점검 결과입니다.</b> ${why.join(" ")}</p>`
+    + (how.length ? `<p>다시 점검하려면: ${[...new Set(how)].join(" ")}</p>` : "")
+    + (c.left_count || c.failed_count ? "<p>점검하지 못한 주소 목록은 아래 안내 상자에서 펼쳐 볼 수 있습니다.</p>" : "");
+}
+const FAIL = { timeout:"응답 시간 초과", network:"접속 오류", server:"서버 오류", blocked:"접근 거부",
+               error:"열기 오류", partial:"끝까지 읽지 못함", stalled:"응답이 멈춰 건너뜀", gone:"없는 주소" };
+/* 점검 범위: 열지 못한 페이지·열지 않은 주소. '0건'이 깨끗해서인지 못 봐서인지 알 수 있게 한다 */
+function coverageNotice() {
+  const c = (DATA.meta || {}).coverage;
+  if (!c) return "";
+  const parts = [];
+  if (c.in_progress) parts.push(`<p>분석 미완료 페이지: ${esc(showUrl(c.in_progress))}</p>`);
+  if (c.invalid_candidates) parts.push(`<p>무효·반복 탐색 후보 ${c.invalid_candidates}건 제외</p>`);
+  if (c.exclusion_rule_count || c.excluded_count) parts.push(`<details><summary>담당자 확인으로 점검 제외 ${c.excluded_count || 0}건 (이 누리집에 해당하는 규칙 ${c.exclusion_rule_count || 0}건)</summary>
+    <p>아래 주소와 그 안에서만 연결된 페이지는 점검하지 않았습니다.</p>
+    <ul>${(c.excluded || []).map((r) => `<li>${esc(r.url)} — ${esc(r.reason)}</li>`).join("")}</ul></details>`);
+  if (c.failed_count) parts.push(`<details><summary>열지 못했거나 끝까지 읽지 못한 페이지 ${c.failed_count}건 — 점검되지 않았습니다 (`
+    + Object.entries(c.failed_kinds || {}).map(([k, n]) => `${esc(FAIL[k] || k)} ${n}`).join(", ") + `)</summary>
+    <ul>${c.failed.map((f) => `<li>${esc(showUrl(f.url))} — ${esc(FAIL[f.reason] || f.reason)}${f.status ? ` (${esc(f.status)})` : ""}</li>`).join("")}</ul>
+    ${c.failed_count > c.failed.length ? `<p>외 ${c.failed_count - c.failed.length}건은 결과 폴더의 scan_coverage.json 에 있습니다.</p>` : ""}</details>`);
+  if (c.retry_waiting_count) parts.push(`<details><summary>첫 열기에 실패해 다시 열 차례를 기다리다 점검하지 못한 주소 ${c.retry_waiting_count}건</summary>
+    <ul>${(c.retry_waiting || []).map((f) => `<li>${esc(showUrl(f.url))} — ${esc(FAIL[f.reason] || f.reason)}${f.status ? ` (${esc(f.status)})` : ""}</li>`).join("")}</ul></details>`);
+  if (c.frame_failed_pages) parts.push(`<details><summary>하위 iframe 글을 읽지 못한 페이지 ${c.frame_failed_pages}곳 — 그 iframe 안은 점검되지 않았습니다</summary>
+    <ul>${(c.frame_failed || []).map((f) => `<li>${esc(showUrl(f.url))} — ${esc(f.frame)}</li>`).join("")}</ul></details>`);
+  if (c.left_count) parts.push(`<details><summary>${(DATA.meta || {}).stopped ? "열지 않은 주소" : `최대 페이지 수(${esc(c.max_pages)})에 닿아 열지 않은 주소`} ${c.left_count}건</summary>
+    <ul>${c.left.map((u) => `<li>${esc(showUrl(u))}</li>`).join("")}</ul></details>`);
+  if (c.gone_count) parts.push(`<details><summary>없는 주소(404 등) ${c.gone_count}건 — 누리집에 깨진 링크가 있습니다</summary>
+    <ul>${c.gone.map((f) => `<li>${esc(showUrl(f.url))} (${esc(f.status)})</li>`).join("")}</ul></details>`);
+  return parts.join("");
+}
+// 안내는 상자 하나에 모아 결과 위에 한 번만 보인다
+function notices() {
+  const m = DATA.meta || {}, h = m.history;
+  let out = m.save_error ? `<p>${esc(m.save_error)}</p>` : "";
+  out += m.stopped && !partialInfo() ? `<p>${esc(STOP_NOTE[m.stopped] || "")}</p>` : "";   // 부분 점검이면 맨 위 안내에 있다
+  // 그림 속 글자 검사를 켰지만 이 PC 에서 글자 인식을 쓸 수 없었으면, 그림 속 광고는 보지 못한 것이다
+  if (m.ocr_unavailable) out += `<p>그림 속 글자 검사를 하지 못했습니다: ${esc(m.ocr_unavailable)}. 그림 속 광고는 이번 점검에 포함되지 않았습니다.</p>`;
+  out += coverageNotice();
+  if (m.recheck) {
+    const c = m.recheck.counts;
+    out += `<p>${esc(shortTime(m.recheck.at))} 조치 확인: ` +
+      Object.keys(CHECK).filter((k) => c[k]).map((k) => `${CHECK[k]} ${c[k]}건`).join(" · ") +
+      `. 다른 페이지에 새로 올라온 광고는 [다시 점검]으로 찾습니다.</p>`;
+  }
+  if (h && (h.uncompared || []).length) {
+    out += `<p>지난 점검(${esc(localTime(h.prev_finished))}) 때와 검사 항목이 달라, ${esc(h.uncompared.join("·"))} 검사 결과는 지난 점검과 비교하지 않았습니다.</p>`;
+  }
+  if (h && h.excluded_page_count) {
+    out += `<p>점검 제외 주소의 iframe·첨부 등이 들어 있던 페이지 ${h.excluded_page_count}곳은 검출이 줄었을 수 있어, 그 페이지의 광고는 지난 점검과 ‘사라짐’을 비교하지 않았습니다.</p>`;
+  }
+  if (h && h.gone_count) {
+    out += `<details><summary>지난 점검(${esc(localTime(h.prev_finished))}) 때 있던 광고 ${h.gone_count}건이 이번에는 보이지 않습니다</summary>
+      <ul>${h.gone.map((g) => `<li>${esc(showUrl(g.url))} — ${esc((g.evidence_text || "").slice(0, 60))}</li>`).join("")}</ul></details>`;
+  }
+  return out;
+}
+
+/* ── 결과 목록 표 ── */
+function statusSelect(st, label) {
+  return `<select class="${esc(st)}" aria-label="${esc(label)}">${
+    Object.entries(PICK).map(([v, t]) => `<option value="${v}"${st === v ? " selected" : ""}>${t}</option>`).join("")}</select>`;
+}
+// 조치 확인에서 사라짐·아직 있음은 처리 상태(확인·미확인)로 알 수 있어 표시하지 않는다.
+// 페이지를 열지 못해 모르는 경우만 회색으로 남긴다 (상태만 보면 '아직 있음'과 같아 보이므로)
+function badgeHtml(f) {
+  const b = f.check === "unknown" || f.check === "skipped" ? ["", CHECK[f.check]]
+    : f.is_new ? ["red", "새로 생김"]
+    : f.grade ? [["취약", "피해 발생 또는 광고 확인됨"].includes(f.grade) ? "warn" : "", f.grade]
+    : f.carried && f.status === "fp" ? ["", "오탐 이어받음"] : null;
+  return b ? `<span class="lbl-tag ${b[0]}">${esc(b[1])}</span>` : "";
+}
+// 한 줄에 묶인 항목 중 담당자가 먼저 알아야 할 표시 하나 (확인 못 함 > 새로 생김 > 그 밖)
+const badgeRow = (e) => e.rows.find((r) => r.check === "unknown" || r.check === "skipped")
+  || e.rows.find((r) => r.is_new) || e.f;
+function rowHtml(e, i) {
+  const f = e.f, st = entryStatus(e), pages = e.same ? new Set(e.same.map((r) => r.url)).size : 0,
+    tags = levelHtml(entryLevel(e)) + badgeHtml(badgeRow(e));
+  return `<tr class="${esc(st)}" data-k="${esc(e.key)}">
+    <td class="num">${i + 1}</td>
+    <td class="manage">${statusSelect(st, `${i + 1}번 처리 상태`)}</td>
+    <td class="ad"><div class="adcell"><a href="#ad-${i + 1}" class="adlink" data-go title="${esc(f.evidence_text)}">${esc(f.evidence_text)}</a>${tags ? `<span class="subtags">${tags}</span>` : ""}</div></td>
+    <td>${esc(entryLabel(e))}</td>
+    <td class="pg">${e.same ? `공통 서식 · ${pages}곳` : esc(shortUrl(f.url))}${e.rows.some((r) => r.scan_excluded) ? '<div class="help">점검 제외 주소 포함</div>' : ""}</td>
+    <td class="ctl"><a href="#ad-${i + 1}" class="btn sm" data-go aria-label="${i + 1}번 상세 보기">보기</a></td></tr>`;
+}
+function renderRows() {
+  // 검색 조건이 걸려 있으면 전체 건수와 함께 보여, 결과가 빠진 것처럼 보이지 않게 한다.
+  // 기본값(미확인만)은 조건이 걸린 것으로 치지 않는다. 접힌 묶음이 그 나머지를 보여 준다
+  const all = entries(DATA.findings).length, st = $("statusf").value;
+  const filtered = !!$("q").value.trim() || st !== baseStatus || $("levelf").value !== "all" || $("newonly").checked;
+  $("total").innerHTML = filtered ? `전체 ${all}건 중 <b>${mainCount}</b>건 표시`
+    : REST.length ? `미확인 <b>${mainCount}</b>건 · 전체 ${all}건` : `총 <b>${all}</b>건`;
+  $("clearf").hidden = !filtered;
+  const fp = REST.filter((e) => entryStatus(e) === "fp").length, done = REST.length - fp;
+  $("restbox").hidden = !REST.length;
+  $("restsum").innerHTML = `오탐 처리 ${fp}건 · 확인 ${done}건 ${restOpen ? "접기" : "보기"}<small>처리를 마친 항목</small>`;
+  if ($("restbox").open !== restOpen) $("restbox").open = restOpen;
+  $("restrows").innerHTML = restOpen ? ENTRIES.slice(mainCount).map((e, j) => rowHtml(e, mainCount + j)).join("") : "";
+  if (!mainCount) {
+    $("rows").innerHTML = `<tr class="emptyrow"><td colspan="6">${
+      !filtered && REST.length ? `미확인 광고가 없습니다. 오탐 처리·확인 ${REST.length}건은 아래에서 펼쳐 볼 수 있습니다.`
+      : `검색 조건에 맞는 광고가 없습니다. 전체 ${all}건은 [검색 조건 초기화]를 누르면 다시 보입니다.`}</td></tr>`;
+  } else {
+    $("rows").innerHTML = ENTRIES.slice(0, mainCount).map(rowHtml).join("");
+  }
+  if (refocus && refocus.key) {
+    const r = $("listpart").querySelector(`tr[data-k="${CSS.escape(refocus.key)}"] ${refocus.sel}`);
+    if (r) r.focus();
+    refocus = null;
+  }
+}
+$("restbox").addEventListener("toggle", (ev) => {
+  if (ev.target.open === restOpen) return;      // 화면 갱신으로 맞춘 상태는 다시 그리지 않는다
+  restOpen = ev.target.open;
+  render();
+});
+const entryOf = (el) => { const tr = el.closest("tr[data-k]"); return tr && ENTRIES.find((e) => e.key === tr.dataset.k); };
+for (const id of ["rows", "restrows"]) {
+  $(id).addEventListener("change", (ev) => {
+    const e = entryOf(ev.target);
+    if (!e || ev.target.tagName !== "SELECT") return;
+    refocus = { key:e.key, sel:"select" };
+    saveTo(e, { status: ev.target.value }, false, `${ENTRIES.indexOf(e) + 1}번 처리 상태를 '${STATUS[ev.target.value]}'로 저장했습니다.`);
+  });
+  $(id).addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-go]");
+    const e = b && entryOf(b);
+    if (e) { ev.preventDefault(); openDetail(e.key); }
+  });
+}
+
+// 한 줄(광고 하나)에 묶인 항목 모두에 상태·메모를 함께 적용한다. 공통 서식 묶음이면 묶인 모든 페이지에 적용된다.
+// 저장이 실패하면 서버 상태를 다시 읽어 화면도 되돌린다
+let pendingSave = Promise.resolve();
+function saveTo(e, patch, quiet, msg, quietSr) {
+  const targets = e.rows;
+  pendingSave = pendingSave.then(async () => {
+    for (const row of targets) await save(row, patch);
+    if (!quiet) render();
+    if (msg) notify(msg, quietSr);
+  }).catch(async (err) => {
+    await tell(`조치 기록을 저장하지 못했습니다. ${err.message}`, "저장 실패");
+    await load();
+  });
+}
+async function save(f, patch) {
+  const saved = await api("/api/review", { method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(Object.assign({ key:f.key }, patch)) });
+  Object.assign(f, saved);
+}
+
+/* ── 상세: 광고 하나를 한 쪽에 ── */
+function openDetail(key) {
+  selKey = key; view = "detail";
+  render();
+  $("ddbody").scrollTop = 0;
+  $("dtitle").focus();
+}
+function closeDetail() {
+  const key = selKey;
+  view = "list"; render();
+  const r = $("listpart").querySelector(`tr[data-k="${CSS.escape(key)}"] .adlink`); if (r) r.focus();
+}
+// Esc·바깥(어두운 곳) 누르기로 닫는다. 브라우저가 바로 닫지 않게 하고 목록 상태와 함께 닫는다
+$("detaildlg").addEventListener("cancel", (ev) => { ev.preventDefault(); closeDetail(); });
+$("detaildlg").addEventListener("click", (ev) => { if (ev.target === $("detaildlg")) closeDetail(); });
+function renderDetail() {
+  const i = ENTRIES.findIndex((x) => x.key === selKey), e = ENTRIES[i];
+  selIdx = i;
+  const f = e.f, same = e.same, pages = same ? [...new Set(same.map((r) => r.url))] : null, st = entryStatus(e);
+  // 한 자리에 수법이 여럿 겹친 광고면 수법마다 설명·조치 방법을 함께 보인다
+  const kinds = [...new Map(e.rows.map((r) => [techLabel(r), r])).values()];
+  const steps = [...new Set(kinds.flatMap(guideFor))];
+  const lvl = entryLevel(e);
+  const exclusionUrls = [...new Set(e.rows.map((r) => r.url))];
+  const box = $("detailview");
+  box.innerHTML = `
+    <div class="dd-head">
+      <h2 class="d-title" id="dtitle" tabindex="-1" title="${esc(f.evidence_text)}">${esc(f.evidence_text)}</h2>
+      ${levelHtml(lvl)}
+      <span class="pos">${i + 1} / ${ENTRIES.length}</span>
+      <button type="button" class="btn sm" id="dback" aria-label="상세 닫기">닫기 ✕</button>
+    </div>
+    <div class="dd-status">
+      <div class="radios" role="radiogroup" aria-label="처리 상태">
+        <label><input type="radio" name="dst" value="open"${st === "open" ? " checked" : ""}>미확인</label>
+        <label><input type="radio" name="dst" value="done"${st === "done" ? " checked" : ""}>확인</label>
+        <label><input type="radio" name="dst" value="fp"${st === "fp" ? " checked" : ""}>오탐 처리</label>
+      </div>
+      <input id="dmemo" value="${esc(f.memo)}" placeholder="담당자 메모 (자동 저장)" aria-label="담당자 메모">
+    </div>
+    <div class="dd-body" id="ddbody">
+    <table class="kv"><caption class="sr">광고 정보</caption><tbody>
+      <tr><th scope="row">유형</th><td>${kinds.map((r) => `<b>${esc(techLabel(r))}</b>${techDesc(r) ? ` — ${esc(techDesc(r))}` : ""}`).join("<br>")}</td></tr>
+      <tr><th scope="row">페이지</th><td>${pages ? `공통 서식 · 페이지 ${pages.length}곳`
+        : /^https?:\/\//i.test(f.url) ? `<a href="${esc(f.url)}" target="_blank" rel="noopener" title="새 창에서 열기">${esc(showUrl(f.url))}</a>` : esc(showUrl(f.url))}</td></tr>
+      <tr><th scope="row">판정 이유</th><td>${esc(f.reason)}</td></tr>
+      ${lvl ? `<tr><th scope="row">판정 등급</th><td>${levelHtml(lvl)} ${esc(LEVEL_HELP[lvl.level])}
+        ${lvl.reasons.length ? `<ul class="lvwhy">${lvl.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}</td></tr>` : ""}
+      ${f.grade ? `<tr><th scope="row">등급</th><td>${badgeHtml({ grade:f.grade })}</td></tr>` : ""}
+      ${f.is_new ? '<tr><th scope="row">지난 점검 대비</th><td>새로 생김 — 지난 점검 때는 없던 광고입니다.</td></tr>' : ""}
+      ${f.check ? `<tr><th scope="row">조치 확인</th><td>${esc(shortTime(f.checked_at))} ${esc(CHECK[f.check] || f.check)}</td></tr>` : ""}
+      ${f.carried && f.status === "fp" ? '<tr><th scope="row">오탐 이어받음</th><td>게시판 글 순서가 바뀌어 위치가 달라졌지만, 같은 페이지의 같은 문구를 지난번에 오탐 처리했습니다.</td></tr>' : ""}
+    </tbody></table>
+
+    <div class="sec">
+      <div class="record">
+        <h3>다음 점검에서 주소 제외</h3>
+        <p class="help">‘오탐 처리’만 하면 다음에도 검사합니다. 아래에서 등록하면 선택한 주소 전체를 건너뜁니다. 같은 누리집의 다른 주소는 계속 검사합니다.</p>
+        <label for="dexurl">직접 확인한 페이지</label>
+        <select id="dexurl">${exclusionUrls.map((u, n) => `<option value="${n}">${esc(u)}</option>`).join("")}</select>
+        <p class="help" id="dexstate"></p>
+        <label for="dexreason">오탐 확인 사유 (필수)</label>
+        <input id="dexreason" maxlength="1000" placeholder="예: 원문을 확인했으며 도박 예방 안내문임">
+        <p><label><input type="checkbox" id="dexconfirmed"> 원문·증거를 직접 확인했습니다. 이 주소는 내용이 바뀌어도 검사하지 않으며, 그 안에서만 연결된 페이지도 발견하지 못할 수 있음을 확인했습니다.</label></p>
+        <button class="btn" type="button" id="dexadd">오탐 확인 · 이 주소 제외</button>
+        <p id="dexerr" role="alert"></p>
+      </div>
+    </div>
+
+    <div class="sec"><h2>조치 방법</h2>
+      ${pages ? `<div class="alert sharedbox"><div><p>메뉴·하단·배너처럼 모든 페이지가 함께 쓰는 <b>공통 서식</b>에 든 광고입니다. 공통 서식에서 한 번 지우십시오. 처리 상태·메모는 ${pages.length}곳 모두에 적용됩니다.</p>
+        <details><summary>페이지 ${pages.length}곳 보기</summary><ul>${pages.map((u) => `<li>${esc(showUrl(u))}</li>`).join("")}</ul></details></div></div>` : ""}
+      <ol class="fix">${steps.map((g) => `<li>${esc(g)}</li>`).join("")}</ol>
+    </div>
+
+    ${f.evidence_key ? `<div class="sec"><h2>증거 사진</h2>
+      ${f.evidence_image ? `<div class="shot"><img src="${esc(f.evidence_image)}" alt="숨겨진 광고를 드러낸 화면"></div>
+      <p class="cap">숨김을 풀어 찍은 사진입니다. 실제 누리집에는 이렇게 보이지 않습니다.</p>` : `<p class="cap">${esc(notSaved("evidence"))}</p>`}</div>` : ""}
+
+    <div class="sec"><h2>판정 정보</h2>
+      <table class="kv"><caption class="sr">판정 정보</caption><tbody>
+        <tr><th scope="row">${f.grade ? "판정 근거" : "광고로 본 근거"}</th><td>${f.keywords.map((k) => `<code>${esc(k)}</code>`).join(" ") || "-"}</td></tr>
+        ${f.normalized ? `<tr><th scope="row">복원한 글자</th><td><code>${esc(f.normalized)}</code></td></tr>` : ""}
+      </tbody></table>
+      <details class="more" id="dpage"><summary>점검 때 저장한 누리집 화면 보기</summary><div></div></details>
+      ${f.evidence_key ? `<details class="more"><summary>원본 코드 보기</summary><div><pre class="src">${esc(f.outer_html || `(${notSaved("code")})`)}</pre>
+        <p class="cap">관리 화면이나 게시판 편집기에서 이 코드를 찾아 지웁니다.</p></div></details>` : ""}
+    </div>
+    </div>
+    <div class="dd-foot">
+      ${navLink("dprev", i - 1, "◀ 이전 광고")}
+      ${navLink("dnext", i + 1, "다음 광고 ▶")}
+    </div>`;
+  $("dback").onclick = (ev) => { ev.preventDefault(); closeDetail(); };
+  const go = (j) => (ev) => { ev.preventDefault(); if (!ENTRIES[j]) return; selKey = ENTRIES[j].key; render(); $("ddbody").scrollTop = 0; $("dtitle").focus(); };
+  $("dprev").onclick = go(i - 1);
+  $("dnext").onclick = go(i + 1);
+  const updateExcludedState = () => {
+    const u = exclusionUrls[Number($("dexurl").value)];
+    const excluded = e.rows.some((r) => r.url === u && r.scan_excluded);
+    $("dexstate").textContent = excluded ? "현재 제외 중입니다. 위쪽 [점검 제외 목록]에서 해제할 수 있습니다." : "아직 제외하지 않은 주소입니다.";
+    $("dexadd").disabled = excluded;
+  };
+  $("dexurl").onchange = () => { $("dexconfirmed").checked = false; updateExcludedState(); };
+  updateExcludedState();
+  $("dexadd").onclick = async () => {
+    const reason = $("dexreason").value.trim();
+    if (!reason || !$("dexconfirmed").checked) {
+      $("dexerr").textContent = "확인 사유를 입력하고 직접 확인 항목에 체크하십시오.";
+      return;
+    }
+    const url = exclusionUrls[Number($("dexurl").value)];
+    $("dexadd").disabled = true;
+    try {
+      await api("/api/exclusions", {method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"add", keys:e.rows.filter((r) => r.url === url).map((r) => r.key),
+          reason, confirmed:true})});
+      await refreshExclusions();
+      await load();
+      announce("오탐 확인과 주소 제외를 저장했습니다. 다음 점검부터 적용됩니다.");
+    } catch (err) { $("dexerr").textContent = err.message; $("dexadd").disabled = false; }
+  };
+  // 저장한 페이지는 펼칠 때만 불러온다 (펼치기 전에는 광고 위치로 화면이 끌려가지 않게)
+  $("dpage").addEventListener("toggle", (ev) => {
+    const d = ev.target.querySelector("div");
+    if (!ev.target.open || d.firstChild) return;
+    const src = `/api/page?u=${encodeURIComponent(f.url)}&sel=${encodeURIComponent(f.location)}`;
+    d.innerHTML = savedOption("snapshots") === false ? `<p class="cap">${esc(notSaved("snapshots"))}</p>`
+      : `<iframe class="page" src="${esc(src)}" sandbox="allow-scripts" title="점검 시점 페이지"></iframe>
+      <p class="cap">광고 위치를 빨간 테두리로 표시했습니다.</p>`;
+  });
+  box.querySelectorAll('input[name="dst"]').forEach((r) => (r.onchange = () => {
+    refocus = { detail:true };
+    saveTo(e, { status: r.value }, false, `처리 상태를 '${STATUS[r.value]}'로 저장했습니다.`);
+  }));
+  // 상태를 바꾼 뒤 다시 그려도 키보드 위치를 잃지 않게 한다
+  if (refocus && refocus.detail) {
+    const r = box.querySelector('input[name="dst"]:checked') || box.querySelector('input[name="dst"]');
+    if (r) r.focus();
+    refocus = null;
+  }
+  const memo = $("dmemo");
+  let t = null;
+  memo.oninput = () => { clearTimeout(t); t = setTimeout(() => saveTo(e, { memo: memo.value }, true, "메모를 저장했습니다.", true), 500); };
+}
+// 이전·다음 광고는 링크. 없으면 누를 수 없음을 알린다
+function navLink(id, j, label) {
+  return ENTRIES[j] ? `<a href="#ad-${j + 1}" class="btn" id="${id}">${label}</a>`
+    : `<a class="btn" id="${id}" aria-disabled="true">${label}</a>`;
+}
+
+/* ── 맥락 도움말: 눌러서 열고 Esc 로 닫는다. 한 번에 하나만 ── */
+function closeHelps(except) {
+  document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach((b) => {
+    if (b === except) return;
+    b.setAttribute("aria-expanded", "false"); $(b.getAttribute("aria-controls")).hidden = true;
+  });
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest(".help-btn");
+  if (!b) { if (!ev.target.closest(".help-pop")) closeHelps(); return; }
+  ev.preventDefault();                       // 체크박스 이름(label) 안에 있어도 설정을 바꾸지 않는다
+  const open = b.getAttribute("aria-expanded") !== "true";
+  closeHelps(b);
+  b.setAttribute("aria-expanded", String(open)); $(b.getAttribute("aria-controls")).hidden = !open;
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape") return;
+  const b = document.querySelector('.help-btn[aria-expanded="true"]');
+  if (b) { ev.preventDefault(); closeHelps(); b.focus(); }
+});
+/* 본문 바로가기: 지금 보이는 화면의 제목으로 */
+$("skip").addEventListener("click", (ev) => {
+  ev.preventDefault();
+  const t = view === "detail" && !$("body").hidden ? $("dtitle")
+    : document.querySelector(".stage:not([hidden]) h1");
+  if (t) { t.setAttribute("tabindex", "-1"); t.focus(); }
+});
+/* 화면 낭독기 알림과 저장 알림 */
+function announce(msg) { $("live").textContent = ""; setTimeout(() => ($("live").textContent = msg), 50); }
+let snackT = null;
+function notify(msg, quietSr, undo) {
+  const n = $("snack");
+  n.setAttribute("role", quietSr ? "presentation" : "status");
+  n.textContent = msg; n.hidden = false;
+  if (undo) {                       // 방금 한 일을 되돌리는 단추 (키워드 끄기·지우기)
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = "되돌리기";
+    b.onclick = () => { n.hidden = true; undo(); };
+    n.append(b);
+  }
+  clearTimeout(snackT); snackT = setTimeout(() => (n.hidden = true), undo ? 5000 : 2500);
+}
+
+$("q").addEventListener("input", () => render());
+$("statusf").addEventListener("change", () => render());
+$("newonly").addEventListener("change", () => render());
+$("levelf").addEventListener("change", () => render());
+$("run-history").addEventListener("click", () => window.open("/api/history.html", "_blank"));
+$("csv").addEventListener("click", () => (location.href = "/api/export.csv"));
+$("report").addEventListener("click", () => window.open("/api/report.html", "_blank"));
+$("stop").addEventListener("click", async () => {
+  $("stop").disabled = true;
+  $("stop").textContent = "멈추는 중…";
+  try {
+    await api("/api/stop", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" });
+    announce(STOPPING);
+  } catch (e) {
+    $("stop").disabled = false;
+    $("stop").textContent = "중지 다시 요청";
+    $("runmsg").textContent = "중지 요청을 전달하지 못했습니다: " + e.message;
+    announce($("runmsg").textContent);
+  }
+});
+function setArchivePath(path) {
+  $("st-right").textContent = path ? `실행 기록: ${path}` : "";
+  $("st-right").title = path;
+  $("st-right").hidden = !path;
+  $("recordpathtext").textContent = path;
+}
+$("st-right").addEventListener("click", () => $("recordpathdlg").showModal());
+$("quit").addEventListener("click", async () => {
+  if (quitting || $("askdlg").open) return;
+  if (!(await ask("점검 도구를 종료할까요?\n진행 중인 작업을 멈추고 결과를 저장한 뒤 창을 닫습니다.",
+                  { title:"프로그램 종료", ok:"종료", cancel:"계속 사용" })) || quitting) return;
+  quitting = true;
+  $("app").inert = true;
+  $("quit").textContent = "종료 중…";
+  $("st-left").textContent = "진행 중인 작업을 멈추고 결과를 저장하는 중입니다";
+  try {
+    await api("/api/quit", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" });
+    clearInterval(poll);
+    // 전용 앱 창은 서버가 닫는다. 기본 브라우저로 연 탭에서도 닫기를 시도한다.
+    window.close();
+    $("app").hidden = true;
+    const closed = document.createElement("div");
+    closed.className = "closed";
+    closed.textContent = "프로그램이 종료되었습니다.";
+    document.body.appendChild(closed);
+  } catch (e) {
+    quitting = false;
+    $("app").inert = false;
+    $("quit").textContent = "프로그램 종료";
+    $("st-left").textContent = "종료 요청을 처리하지 못했습니다: " + e.message;
+    announce($("st-left").textContent);
+  }
+});
+
+/* ── 점검 키워드 관리 화면 ── */
+$("kwbtn").addEventListener("click", () => {
+  const now = $("app").dataset.stage;
+  if (now === "keywords") return;
+  kwBack = now || "start";
+  $("kwback").textContent = KW_BACK[kwBack] || "← 돌아가기";
+  setStage("keywords");
+  $("kwstage").scrollTop = 0;
+  kwLoad();
+  $("kwback").focus();
+});
+$("kwback").addEventListener("click", () => { setStage(kwBack, true); $("kwbtn").focus(); });
+
+// 분류마다 판정 세기를 이름 옆에 짧게 보인다 (규칙 설명은 서버의 desc)
+const KW_LEVEL = { STRONG:["s", "이것만으로 광고"], TOPIC:["m", "단서 1개 더"], MEDIUM:["m", "단서 2개 더"],
+                   WEAK:["w", "점수만 보탬"], CAUTION:["c", "점수 낮춤"] };
+const KW_MANY = 40;       // 단어가 이보다 많은 상자는 처음에 몇 줄만 보이고 펼쳐 본다
+const low = (s) => String(s).toLowerCase();
+const kwPost = (path, body) => api(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+let KW = [], kwFresh = null, kwHits = new Set(), kwBusy = false;
+const kwTall = new Set();
+const kwCatOf = (id) => KW.find((c) => c.id === id);
+
+function kwRender() {
+  const q = low($("kwfind").value.replace(/\s+/g, ""));
+  $("kwcats").innerHTML = KW.map((c) => {
+    const user = c.added.filter((w) => !q || low(w).includes(q));
+    const base = c.builtin.filter((b) => !q || low(b.word).includes(q));
+    const offN = c.builtin.filter((b) => !b.on).length;
+    const lv = KW_LEVEL[c.id] || ["w", ""];
+    const chip = (w, cls, attrs) => {
+      const k = c.id + "\u0000" + w;
+      return `<button class="kw ${cls}${kwFresh === k ? " new" : ""}${kwHits.has(low(w)) ? " hit" : ""}" type="button" data-cat="${esc(c.id)}" data-w="${esc(w)}" ${attrs}>`;
+    };
+    const userChips = user.map((w) => chip(w, "user", `data-act="remove" title="누르면 지웁니다" aria-label="${esc(w)} 지우기"`)
+      + `${esc(w)} <span class="x" aria-hidden="true">✕</span></button>`).join("");
+    const baseChips = base.map((b) => chip(b.word, b.on ? "" : "off",
+      `data-act="toggle" aria-pressed="${b.on}" title="${b.on ? "누르면 끕니다" : "누르면 켭니다"}"`) + `${esc(b.word)}</button>`).join("");
+    const long = c.builtin.length + c.added.length > KW_MANY && !q;
+    return `<section class="kwcat${kwTall.has(c.id) || q ? " tall" : ""}" id="kwcat-${esc(c.id)}" aria-labelledby="kwh-${esc(c.id)}">
+      <div class="kwcat-head">
+        <div><h2 id="kwh-${esc(c.id)}">${esc(c.name)}<span class="kwlvl ${lv[0]}">${esc(lv[1])}</span></h2><div class="rule">${esc(c.desc)}</div></div>
+        <div class="cnt">켜짐 <b>${c.builtin.length - offN + c.added.length}</b>${offN ? ` · 꺼짐 <b>${offN}</b>` : ""}${c.added.length ? `<br>추가 <b>${c.added.length}</b>` : ""}</div>
+      </div>
+      <div class="kwchips">${userChips}${baseChips}${!user.length && !base.length ? '<span class="kwnone">찾는 단어가 없습니다.</span>' : ""}</div>
+      ${long ? `<button class="kwmore" type="button" data-more="${esc(c.id)}" aria-expanded="${kwTall.has(c.id)}">${kwTall.has(c.id) ? "접기 ▴" : `전체 ${c.builtin.length + c.added.length}건 펼치기 ▾`}</button>` : ""}
+    </section>`;
+  }).join("");
+  kwFresh = null;
+}
+
+async function kwLoad() {
+  try {
+    KW = (await api("/api/keywords")).categories;
+    const sel = $("kwcat").value;
+    $("kwcat").innerHTML = KW.map((c) => `<option value="${esc(c.id)}" title="${esc((KW_LEVEL[c.id] || ["", ""])[1])}">${esc(c.name)}</option>`).join("");
+    if (sel) $("kwcat").value = sel;
+    $("kwerr").hidden = true;
+    kwRender();
+  } catch (e) { $("kwerrmsg").textContent = e.message; $("kwerr").hidden = false; }
+}
+
+// 서버에 바꾼 내용을 보내고 목록을 새로 받는다. 실패하면 알리고 null
+async function kwEdit(body) {
+  if (kwBusy) return null;
+  kwBusy = true;
+  try {
+    const r = await kwPost("/api/keywords", body);
+    KW = r.categories;
+    kwRender();
+    if ($("kwtest").value.trim()) await kwJudge(true);
+    return r;
+  } catch (e) {
+    notify(e.message);
+    return null;
+  } finally { kwBusy = false; }
+}
+
+$("kwcats").addEventListener("click", async (ev) => {
+  const more = ev.target.closest("[data-more]");
+  if (more) { const id = more.dataset.more; kwTall.has(id) ? kwTall.delete(id) : kwTall.add(id); kwRender(); return; }
+  const b = ev.target.closest("button.kw");
+  if (!b) return;
+  const { act, cat, w } = b.dataset;
+  if (act === "toggle") {
+    const wasOn = b.getAttribute("aria-pressed") === "true";
+    if (!await kwEdit({ action:"toggle", cat, word:w, on:!wasOn })) return;
+    notify(wasOn ? `'${w}'${josa(w, "을", "를")} 껐습니다. 이 단어로는 광고를 찾지 않습니다.` : `'${w}'${josa(w, "을", "를")} 다시 켰습니다.`,
+      false, () => kwEdit({ action:"toggle", cat, word:w, on:wasOn }));
+  } else if (act === "remove") {
+    if (!await ask(`직접 추가한 '${w}'${josa(w, "을", "를")} 지울까요?`, { title:"단어 지우기", ok:"지우기", danger:true })) return;
+    if (!await kwEdit({ action:"remove", cat, word:w })) return;
+    notify(`'${w}'${josa(w, "을", "를")} 지웠습니다.`, false, () => kwEdit({ action:"add", cat, word:w }));
+  }
+});
+$("kwfind").addEventListener("input", kwRender);
+
+// 단어 추가: 고른 분류 상자 맨 앞에 빨간 단어로 바로 보이고 그 상자로 옮겨 간다
+$("kwadd").addEventListener("click", async () => {
+  const msg = $("kwaddmsg"), word = $("kwword").value.trim(), cat = $("kwcat").value;
+  if (!word) { $("kwword").focus(); return; }
+  if (kwBusy) return;
+  kwBusy = true;
+  try {
+    const r = await kwPost("/api/keywords", { action:"add", cat, word });
+    KW = r.categories;
+    kwFresh = cat + "\u0000" + r.word;
+    $("kwword").value = ""; $("kwfind").value = "";
+    kwRender();
+    msg.className = "kwaddmsg";
+    msg.textContent = `'${r.word}'${josa(r.word, "을", "를")} '${kwCatOf(cat).name}'에 추가했습니다. 다음 점검부터 적용됩니다.`;
+    const box = $("kwcat-" + cat); if (box) box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    if ($("kwtest").value.trim()) await kwJudge(true);
+  } catch (e) {
+    msg.className = "kwaddmsg bad"; msg.textContent = e.message;
+  } finally { kwBusy = false; }
+});
+$("kwword").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("kwadd").click(); });
+$("kwreset").addEventListener("click", async () => {
+  if (!await ask("직접 추가한 단어를 모두 지우고 꺼 둔 기본 단어를 모두 켤까요?", { title:"기본값으로 되돌리기", ok:"되돌리기" })) return;
+  if (await kwEdit({ action:"reset" })) notify("기본값으로 되돌렸습니다.");
+});
+
+// 시험해 보기: 서버의 실제 판정(숨긴 글·보이는 글)과 판정 등급을 보인다
+async function kwJudge(quiet) {
+  const text = $("kwtest").value.trim(), out = $("kwout");
+  if (!text) { if (!quiet) $("kwtest").focus(); return; }
+  let r;
+  try { r = await kwPost("/api/keywords/test", { text }); }
+  catch (e) { out.className = "kwverdict"; out.innerHTML = `<p style="margin:0">${esc(e.message)}</p>`; return; }
+  // 걸린 키워드는 분류 이름을, 연락처·금액 같은 단서는 '단서'를 붙인다
+  const where = (k) => {
+    const c = KW.find((x) => x.added.some((w) => low(w) === low(k)) || x.builtin.some((b) => b.on && low(b.word) === low(k)));
+    return c ? c.name : "단서";
+  };
+  const words = r.evidence.map((k) => `<span class="w">${esc(k)}<small>${esc(where(k))}</small></span>`).join("");
+  // 오탐 방지 키워드는 판정 근거 목록에 오지 않으므로 복원한 글에 든 것을 따로 보인다
+  const flat = low(r.normalized || "");
+  const caution = kwCatOf("CAUTION") || { builtin:[], added:[] };
+  const soft = caution.builtin.filter((b) => b.on).map((b) => b.word).concat(caution.added).filter((w) => flat.includes(low(w)));
+  const shown = new Set(soft.filter((w) => !soft.some((o) => o !== w && o.length > w.length && low(o).includes(low(w)))));
+  kwHits = new Set(r.evidence.map(low).concat([...shown].map(low)));
+  out.className = "kwverdict " + (r.hidden_level?.decision === "review" || r.visible_level?.decision === "review" ? "" : r.hidden && r.visible ? "ad" : !r.hidden ? "ok" : "");
+  const verdict = (ad, lv) => lv?.decision === "review" ? `<b>광고 근거 부족 ${levelHtml(lv)}</b>` : ad ? `<b class="ad">광고 ${levelHtml(lv)}</b>` : '<b class="ok">광고 아님</b>';
+  const sameLevel = r.hidden && r.visible && r.hidden_level?.level === r.visible_level?.level;
+  out.innerHTML = (r.hidden === r.visible && r.hidden_level?.decision !== "review" && r.visible_level?.decision !== "review"
+      ? `<div class="big">${r.hidden ? "광고로 판정" : "광고 아님"}</div>`
+        + (!r.hidden ? "" : sameLevel ? `<p>판정 등급 ${levelHtml(r.hidden_level)}</p>`
+          : `<div class="split levels"><div><span>숨겨진 글이면</span>${levelHtml(r.hidden_level)}</div>
+               <div><span>화면에 보이는 글이면</span>${levelHtml(r.visible_level)}</div></div>`)
+      : `<div class="split"><div><span>숨겨진 글이면</span>${verdict(r.hidden, r.hidden_level)}</div>
+           <div><span>화면에 보이는 글이면</span>${verdict(r.visible, r.visible_level)}</div></div>
+         <p>화면에 그대로 보이는 글은 정상 게시글일 수 있어 더 엄격하게 봅니다.</p>`)
+    + `<p>찾은 단어: ${words || "없음"}</p>`
+    + (shown.size ? `<p>오탐 방지 키워드: ${[...shown].map((w) => `<span class="w">${esc(w)}</span>`).join("")}</p>` : "")
+    + (r.homoglyph || r.jamo ? `<p>위장 글자를 원래대로 읽으면: <span class="w">${esc(r.normalized)}</span></p>` : "");
+  kwRender();
+}
+$("kwgo").addEventListener("click", () => kwJudge());
+$("kwtest").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); kwJudge(); } });
+$("kwsamples").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (b) { $("kwtest").value = b.textContent; kwJudge(); } });
+
+$("help").addEventListener("click", showGuide);
+$("guideclose").addEventListener("click", () => $("guide").close());
+$("guide").addEventListener("click", (ev) => { if (ev.target === $("guide")) $("guide").close(); });
+
+// 새로고침해도 하던 단계로 돌아온다 (점검 중이면 진행 화면, 끝났으면 결과)
+(async () => {
+  setStage("start");
+  try {
+    const s = await api("/api/status");
+    if (s.running) startRunning("");
+    else if (s.has_result) await load(!sessionStorage.getItem("hwonhi-viewed"));
+    sessionStorage.setItem("hwonhi-viewed", "1");
+  } catch (e) { /* 서버가 아직 준비되지 않았으면 시작 화면 그대로 */ }
+})();
+
+const ping = () => fetch("/api/ping").catch(() => {});
+ping(); setInterval(ping, 5000);
+// 창을 닫으면 프로그램도 바로 끝나도록 알린다 (새로고침이면 곧 ping 이 다시 가서 취소된다)
+window.addEventListener("pagehide", () => navigator.sendBeacon("/api/bye"));
+// 기존 화면에 붙인 선택형 검색 작업. 기본 점검 결과 화면과 상태를 분리한다.
+(() => {
+  const el = id => document.getElementById(id);
+  let message = '', submitting = false, keyBlocked = false, termsBlocked = true, maxTerms = 30;
+  // 유형별 고정 단어(서버에서 받음) + 점검에서 찾은 단어 + 직접 입력 단어를 합친 검색 단어
+  const checkedGroups = () => [...document.querySelectorAll('#search-grouplist input:checked')].map(b => b.value);
+  function extraTerms() {
+    const found = el('search-found');
+    const auto = found.checked && !el('search-foundrow').hidden ? JSON.parse(found.dataset.terms || '[]') : [];
+    return [...auto, ...el('search-terms').value.split('\n').map(t => t.trim()).filter(Boolean)];
+  }
+  function updateEstimate() {
+    const words = new Set(extraTerms());
+    document.querySelectorAll('#search-grouplist input:checked').forEach(b => JSON.parse(b.dataset.terms).forEach(w => words.add(w)));
+    const engines = 1;       // 검색엔진은 구글 하나다
+    const pages = Math.max(1, Math.min(10, Number(el('search-pages').value) || 1));
+    const calls = words.size * engines * pages;
+    termsBlocked = words.size === 0 || words.size > maxTerms;
+    el('search-estimate').textContent = words.size === 0 ? '검색할 광고 유형을 하나 이상 고르십시오.'
+      : words.size > maxTerms ? `검색 단어가 ${words.size}개입니다. ${maxTerms}개 이하로 줄이십시오.`
+      : `검색 단어 ${words.size}개 · 구글 · 최대 ${calls}회 검색 (API 이용 한도 차감)`;
+    el('search-go').disabled = el('search-fields').disabled || keyBlocked || termsBlocked;
+  }
+  async function loadGroups() {
+    try {
+      const data = await request('/api/search/terms');
+      maxTerms = data.max;
+      el('search-grouplist').innerHTML = data.groups.map(g =>
+        `<label style="display:block;margin:4px 0"><input type="checkbox" value="${esc(g.id)}" data-terms='${esc(JSON.stringify(g.terms))}' checked> `
+        + `<b>${esc(g.name)}</b> <span class="help">${g.terms.map(esc).join(' · ')}</span></label>`).join('');
+      updateEstimate();
+    } catch (e) { el('search-estimate').textContent = '광고 유형을 불러오지 못했습니다: ' + e.message; }
+  }
+  ['search-fields'].forEach(id => { el(id).addEventListener('change', updateEstimate); el(id).addEventListener('input', updateEstimate); });
+  const TYPE_LABEL = { SEARCH_REMOVED_AD:'삭제 응답 URL의 검색 노출', SEARCH_PARAMETER_AD:'광고 파라미터 URL',
+                       SEARCH_LIVE_AD:'현재 페이지에도 광고', SEARCH_INDEXED_AD:'검색 제목·요약 노출' };
+  function paintSubmission(sub) {
+    const box = el('search-submission');
+    box.hidden = !sub;
+    if (!sub) return;
+    el('search-submission-head').textContent = sub.count
+      ? `공모전 추가 탐지 파일(result_extra.json)에 이번 검색의 광고 ${sub.count}건을 반영했습니다.`
+      : '검색 결과에서 광고로 판정된 항목이 없어 추가 탐지 파일에 반영한 건은 0건입니다.';
+    el('search-submission-types').textContent = Object.entries(sub.types)
+      .map(([code, n]) => `${TYPE_LABEL[code] || code} ${n}건`).join(' · ');
+    el('search-submission-file').textContent = (sub.merged ? '저장 위치(기존 추가 결과와 합침): '
+      : '다른 대상의 기존 결과가 있어 합치지 않고 이 검색 폴더에만 저장했습니다: ') + sub.file;
+  }
+  async function request(path, data) {
+    const r = await fetch(path, data === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const result = await r.json();
+    if (!r.ok) throw new Error(result.error || '요청 실패');
+    return result;
+  }
+  // ── 검색 범위: 등록 도메인 전체(기본) / 입력한 주소만. 아래 규칙은 안내 문구용이고 실제 값은 서버의 scope.query_host 가 우선한다
+  const SECOND_LEVEL = ['go','ac','or','co','re','mil','ne','pe','hs','ms','es','sc','kg'];
+  function registrable(site) {
+    const host = String(site || '').trim().toLowerCase().replace(/^[a-z][a-z0-9+.-]*:\/\//, '').split(/[\/?#]/)[0].replace(/:\d+$/, '').replace(/\.$/, '');
+    const labels = host.split('.').filter(Boolean);
+    if (labels.length < 2 || /^[\d.]+$/.test(host) || host.includes(':')) return host;
+    const kr = labels[labels.length - 1] === 'kr' && SECOND_LEVEL.includes(labels[labels.length - 2]);
+    return labels.slice(-(kr ? 3 : 2)).join('.');
+  }
+  const scopeValue = () => el('search-scope-host').checked ? 'host' : 'domain';
+  let serverScope = null, lastHost = null;
+  function paintScope() {
+    const host = el('search-scope-host').checked;
+    const subs = el('search-subs');
+    // 하위 도메인 포함 칸은 '입력한 주소만'일 때만 의미가 있다. 도메인 전체이면 포함된 상태로 잠가 둔다
+    if (host !== lastHost) {
+      if (!host) subs.dataset.pref = subs.checked ? '1' : '';
+      subs.checked = host ? subs.dataset.pref === '1' : true;
+      lastHost = host;
+    }
+    subs.disabled = !host;
+    el('search-subsrow').hidden = !host;
+    const typed = el('search-site').value.trim() || (typeof entryHost === 'function' ? entryHost() : '');
+    const base = host ? typed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[\/?#]/)[0] : registrable(typed);
+    let text = !base ? '' : host ? `site:${base} — 입력한 주소의 결과만 모읍니다.`
+      : `site:${base} — ${base} 아래 모든 하위 도메인의 결과를 모읍니다.`;
+    if (serverScope && serverScope.query_host)
+      text += `${text ? ' ' : ''}(최근 검색: site:${serverScope.query_host}, ${serverScope.scope === 'host' ? '입력한 주소만' : '등록 도메인 전체'})`;
+    el('search-scopenote').textContent = text;
+  }
+  ['change', 'input'].forEach(ev => el('search-fields').addEventListener(ev, paintScope));
+
+  // ── 진행 표시: 서버 값(1.5초마다)에 더해 경과 시간은 화면에서 1초 단위로 이어서 센다
+  const pad2 = n => String(n).padStart(2, '0');
+  function dur(sec) {
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
+    const m = Math.floor(sec / 60);
+    return m ? `${m}분 ${pad2(sec % 60)}초` : `${sec}초`;
+  }
+  const QSTATE = { processing:'검색 서비스 처리 중', collected:'수집 완료', no_target_results:'대상 결과 없음', no_results:'결과 없음',
+                   error:'오류', pending:'결과 회수 대기', cancelled:'중지됨' };
+  let view = null, curKey = '', curSince = 0, sigTerms = '', sigErrors = '';
+  const linkCount = q => Array.isArray(q.target_links) ? q.target_links.length : (Number(q.target_links) || 0);
+  function termState(term, qs, s) {
+    const cur = s.progress && s.progress.current;
+    if (s.running && ((cur && cur.term === term) || qs.some(q => q.state === 'processing'))) return ['진행 중', 'st-run'];
+    if (qs.some(q => q.state === 'error')) return ['오류', 'st-bad'];
+    if (qs.some(q => q.state === 'cancelled')) return ['중지됨', 'st-bad'];
+    if (qs.some(q => q.state === 'pending')) return ['회수 대기', 'st-bad'];
+    if (!qs.length) return [s.running ? '대기' : '검색 안 함', 'st-wait'];
+    if (qs.some(q => q.state === 'processing')) return ['미완료', 'st-bad'];
+    return ['완료', 'st-ok'];
+  }
+  function friendlyReason(e) {
+    const raw = String(e.reason || '');
+    if (e.state === 'cancelled') return '중지해서 검색하지 않음';
+    if (e.state === 'pending') return '검색 서비스가 결과를 아직 주지 않음 (대기 결과 회수로 받을 수 있음)';
+    if (/end_of|results_end|no_more|no more|hasn.t returned|empty|결과 끝/i.test(raw)) return '결과 끝';
+    if (/time.?out|timed out|시간 초과/i.test(raw)) return '시간 초과';
+    if (/rate|quota|limit|429|한도/i.test(raw)) return '이용 한도 초과';
+    if (/[가-힣]/.test(raw)) return raw;
+    return '제공자 응답 오류';
+  }
+  function paintTerms(s) {
+    const p = s.progress, queries = s.queries || [];
+    const byTerm = new Map();
+    queries.forEach(q => { if (!byTerm.has(q.term)) byTerm.set(q.term, []); byTerm.get(q.term).push(q); });
+    const terms = [...((p && p.terms) || [])];
+    byTerm.forEach((_, t) => { if (!terms.includes(t)) terms.push(t); });
+    el('search-progress').hidden = !terms.length;
+    const rows = terms.map(t => {
+      const qs = byTerm.get(t) || [], [label, cls] = termState(t, qs, s);
+      return [t, label, cls, qs.reduce((n, q) => n + linkCount(q), 0)];
+    });
+    const sig = JSON.stringify(rows);
+    if (sig === sigTerms) return;
+    sigTerms = sig;
+    el('search-termrows').innerHTML = rows.map(([t, label, cls, n]) =>
+      `<tr><td>${esc(t)}</td><td class="n ${cls}">${esc(label)}</td><td class="n">${n}건</td></tr>`).join('');
+  }
+  function paintErrors(s) {
+    const list = Array.isArray(s.errors) ? s.errors : [];
+    el('search-errors').hidden = !list.length;
+    el('search-errcount').textContent = list.length;
+    const sig = JSON.stringify(list);
+    if (sig === sigErrors) return;
+    sigErrors = sig;
+    el('search-errrows').innerHTML = list.map(e =>
+      `<tr><td>${esc(e.term || '')}</td><td class="n">${e.page ? esc(e.page) + '페이지' : ''}</td>`
+      + `<td>${esc(friendlyReason(e))}${e.detail ? `<details><summary>자세히</summary><pre>${esc(e.detail)}</pre></details>` : ''}</td></tr>`).join('');
+  }
+  // 서버가 갱신하는 사이에도 1초마다 호출되어 경과 시간·현재 질의 시간을 올린다
+  function paintLive() {
+    if (!view) return;
+    const s = view.s, p = s.progress, run = !!s.running, lag = run ? (Date.now() - view.at) / 1000 : 0;
+    const known = p && (p.started_at || (p.terms || []).length);
+    const elapsed = known ? (Number(p.elapsed_sec) || 0) + lag : 0;
+    const failures = (s.queries || []).filter(q => ['error','pending','cancelled','processing'].includes(q.state)).length;
+    let text;
+    if (message || s.error) text = message || s.error;
+    else if (run && s.stopping) text = '중지 요청됨 · 현재 요청을 마친 뒤 저장합니다.';
+    else if (run) text = known ? `검색 진행 중 · ${p.words_done || 0}/${p.words_total || (p.terms || []).length} 단어 · 질의 ${p.queries_done || 0}건 · 경과 ${dur(elapsed)}` : '검색 진행 중…';
+    else text = (known ? `${p.finished ? '완료' : '중단'} · 총 ${dur(p.elapsed_sec)} · ` : '') + `저장 URL ${s.count}건 · 오류/미완료 페이지 ${failures}건`;
+    el('search-status').textContent = text;
+    const bar = el('search-bar'), total = known ? (p.words_total || (p.terms || []).length) : 0;
+    const pct = !known ? 0 : (!run && p.finished) ? 100 : total ? Math.min(100, Math.round((p.words_done || 0) / total * 100)) : 0;
+    bar.firstElementChild.style.width = pct + '%';
+    bar.setAttribute('aria-valuenow', pct);
+    bar.classList.toggle('done', !run && !!(p && p.finished));
+    const cur = run && p && p.current, line = el('search-current');
+    line.hidden = !cur;
+    if (cur) {
+      const key = [cur.term, cur.page, cur.query].join('|');
+      if (key !== curKey) { curKey = key; curSince = Date.now(); }
+      line.textContent = `지금: ${cur.query || cur.term} · ${cur.page || 1}페이지 · ${QSTATE[cur.state] || cur.state || '검색 중'}`
+        + ` · 이 질의 ${dur((Date.now() - curSince) / 1000)}째`;
+    } else curKey = '';
+  }
+  setInterval(paintLive, 1000);
+  async function refresh() {
+    try {
+      const s = await request('/api/search/status');
+      el('search-fields').disabled = s.running || submitting;
+      el('search-go').disabled = s.running || submitting || keyBlocked || termsBlocked;
+      paintSubmission(s.submission);
+      el('search-stop').disabled = !s.running;
+      el('search-stop').hidden = !s.running;
+      el('search-resume').disabled = s.running || submitting || !s.resumable;
+      el('search-resume').hidden = el('search-resume').disabled;
+      el('search-report').hidden = !s.report;
+      s.queries = s.queries || [];
+      view = { s, at: Date.now() };
+      serverScope = s.scope || null;
+      paintScope();
+      paintTerms(s);
+      paintErrors(s);
+      paintLive();
+      el('search-log').textContent = (s.logs || []).join('\n');
+    } catch(e) { el('search-status').textContent = '검색 상태를 불러오지 못했습니다: '+e.message; }
+  }
+  paintScope();
+  async function action(path, body) {
+    submitting = true; message = ''; el('search-go').disabled = true;
+    try { await request(path, body); } catch(e) { message = e.message; }
+    finally { submitting = false; await refresh(); }
+  }
+  el('search-copy').onclick = () => { el('search-site').value = entryHost(); paintScope(); };
+  el('search-go').onclick = () => action('/api/search/start', {
+    site:el('search-site').value || entryHost(), groups:checkedGroups(), terms:extraTerms().join('\n'),
+    engines:['google'], pages:Number(el('search-pages').value), scope:scopeValue(),
+    inspect:el('search-inspect').checked, subdomains:el('search-subs').checked, include_omitted:el('search-omitted').checked
+  });
+  el('search-stop').onclick = () => action('/api/search/stop', {});
+  el('search-resume').onclick = () => action('/api/search/resume', {});
+  async function pollSearch() { if (!quitting) await refresh(); setTimeout(pollSearch, 1500); }
+  pollSearch();
+
+  // 검색 API 연결 상태 (상단 바). 서버가 5분 동안 결과를 저장해 두므로 화면을 열 때마다 이용 한도를 차감하지 않는다
+  const HEALTH = { ok:'검색 API 정상', partial:'검색 API 일부 오류', down:'검색 API 오류',
+                   not_configured:'검색 API 키 없음', checking:'검색 API 확인 중', error:'검색 API 확인 실패' };
+  const STATE = { ok:'정상', not_configured:'키 없음', auth_failed:'인증 실패', quota_exhausted:'이용 한도 소진',
+                  network_error:'연결 실패', error:'오류' };
+  let health = null;
+  function paintHealth(state) {
+    el('apihealth').dataset.state = state;
+    el('apihealthtext').textContent = HEALTH[state] || state;
+    el('apihealth').setAttribute('aria-label', (HEALTH[state] || state) + ' · 자세히 보기');
+    const cta = el('ctahealth'), go = el('search-open');
+    const blocked = state === 'not_configured';
+    go.disabled = blocked;
+    keyBlocked = blocked;
+    el('search-keynote').hidden = !blocked;
+    el('search-keynote-text').textContent = '검색 API 키가 없어 검색을 시작할 수 없습니다. ';
+    cta.className = 'ctahealth' + (['not_configured','down','partial','error'].includes(state) ? ' bad' : '');
+    cta.textContent = blocked ? '검색 API 키가 없습니다. 오른쪽 위 [검색 API]에서 키를 등록하십시오.'
+      : state === 'down' ? '검색 API에 연결하지 못했습니다. 오른쪽 위 [검색 API]에서 원인을 확인하십시오.'
+      : state === 'partial' ? '일부 검색엔진 API에 연결하지 못했습니다. 정상인 검색엔진만 선택하십시오.' : '';
+    if (health) {
+      el('healthlist').innerHTML = health.providers.map((p) =>
+        `<li><b><span class="health" data-state="${p.state === 'ok' ? 'ok' : p.state === 'not_configured' ? 'not_configured' : 'down'}"><i aria-hidden="true"></i></span> ${esc(p.name)}</b>`
+        + `<span>${esc(STATE[p.state] || p.state)} — ${esc(p.message)}</span></li>`).join('');
+      el('healthmeta').textContent = `확인 시각 ${localTime(health.checked_at)}${health.cached ? ' (저장된 결과)' : ''}`;
+      // 연결이 안 되는 검색엔진은 고르지 못하게 한다
+      health.providers.forEach((p) => p.engines.forEach((e) => {
+        const box = el('search-' + e);
+        if (box) { box.disabled = p.state !== 'ok'; if (box.disabled) box.checked = false; }
+      }));
+    }
+    updateEstimate();
+  }
+  async function checkHealth(force) {
+    paintHealth('checking');
+    el('healthrefresh').disabled = true;
+    try { health = await request('/api/search/health' + (force ? '?refresh=1' : '')); paintHealth(health.overall); }
+    catch (e) { health = null; paintHealth('error'); el('healthlist').innerHTML = `<li>${esc(e.message)}</li>`; }
+    finally { el('healthrefresh').disabled = false; }
+  }
+  let keyBusy = false, keyState = {registered:false, environment:false};
+  function keyControls() {
+    el('keysave').disabled = keyBusy || keyState.environment;
+    el('keydelete').disabled = keyBusy || keyState.environment || !keyState.registered;
+    el('search-key').disabled = keyBusy || keyState.environment;
+    el('keyshow').disabled = keyBusy || keyState.environment;
+    el('keystate').textContent = keyState.environment ? '환경변수로 등록됨 · 변경하려면 환경변수를 해제하고 프로그램을 다시 실행하세요.'
+      : keyState.registered ? '등록됨 · 기존 키는 표시하지 않습니다. 변경하려면 새 키를 입력하세요.' : '등록된 키가 없습니다.';
+  }
+  function clearKey() {
+    el('search-key').value = ''; el('search-key').type = 'password';
+    el('keyshow').textContent = '보기'; el('keyshow').setAttribute('aria-pressed', 'false');
+  }
+  async function readKeyState() {
+    try { keyState = await request('/api/search/key'); keyControls(); }
+    catch (e) { el('keymessage').textContent = '등록 상태를 확인하지 못했습니다.'; }
+  }
+  el('keyshow').onclick = () => {
+    const show = el('search-key').type === 'password';
+    el('search-key').type = show ? 'text' : 'password';
+    el('keyshow').textContent = show ? '숨기기' : '보기';
+    el('keyshow').setAttribute('aria-pressed', String(show));
+  };
+  async function editKey(action) {
+    if (keyBusy) return;
+    const data = {action};
+    if (action === 'save') {
+      data.key = el('search-key').value.trim();
+      if (!data.key) { el('keymessage').textContent = 'API 키를 입력하세요.'; return; }
+    }
+    keyBusy = true; keyControls(); el('keymessage').textContent = '처리 중…';
+    try {
+      keyState = await request('/api/search/key', data);
+      clearKey();
+      el('keymessage').textContent = action === 'delete' ? '키를 삭제했습니다.' : '키를 저장했습니다. 연결을 확인합니다…';
+      await checkHealth(true);
+      if (action === 'save') el('keymessage').textContent = health?.overall === 'ok'
+        ? '저장 및 연결 확인이 완료되었습니다.' : '키는 저장되었지만 연결을 확인하지 못했습니다. 아래 상태를 확인하세요.';
+    } catch (e) { el('keymessage').textContent = e.message; }
+    finally { delete data.key; clearKey(); keyBusy = false; keyControls(); }
+  }
+  el('keyform').onsubmit = e => { e.preventDefault(); editKey('save'); };
+  el('keydelete').onclick = () => editKey('delete');
+  el('healthdlg').addEventListener('close', clearKey);
+  el('apihealth').onclick = () => { clearKey(); el('keymessage').textContent = ''; el('healthdlg').showModal(); readKeyState(); };
+  el('healthrefresh').onclick = () => checkHealth(true);
+  el('search-keyopen').onclick = () => el('apihealth').click();
+  loadGroups();
+  checkHealth(false);
+})();
+</script>
+<script>
+// 지난 검색 목록: 디스크에 남은 검색 기록을 다시 열 수 있게 한다 (서버 재시작·새로고침 뒤에도 마지막 검색이 사라진 것처럼 보이지 않게)
+(() => {
+  const H = (id) => document.getElementById(id);
+  let busy = false, running = null, shownFirst = false, openedId = '', runs = [];
+  const post = async (path, data) => {
+    const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || '요청 실패');
+    return body;
+  };
+  const get = async (path) => {
+    const r = await fetch(path, {cache:'no-store'});
+    if (!r.ok) throw new Error('요청 실패');
+    return r.json();
+  };
+  function paint() {
+    H('search-history').hidden = runs.length === 0;
+    H('search-history-summary').textContent = `지난 검색 보기 (${runs.length}건)`;
+    H('search-history-list').innerHTML = runs.map((r) => {
+      const sub = r.submission === null || r.submission === undefined ? '제출 반영 없음' : `제출 반영 ${r.submission}건`;
+      const tags = (r.has_report ? ' · 보고서 있음' : '') + (r.stopped ? ' · 중지됨' : '');
+      return `<li style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line, #ddd)">`
+        + `<span><b>${esc(r.target)}</b> · ${esc(localTime(r.started_at))}<br>`
+        + `<span class="help">질의 ${esc(r.queries)}건 · 수집 URL ${esc(r.urls)}건 · ${esc(sub)}${esc(tags)}</span></span>`
+        + `<button class="btn sm" type="button" data-run="${esc(r.id)}"${busy || running ? ' disabled' : ''}>`
+        + `${r.id === openedId ? '열려 있음' : '열기'}</button></li>`;
+    }).join('');
+  }
+  async function load() {
+    try { runs = (await get('/api/search/runs')).runs || []; }
+    catch (e) { H('search-history-msg').textContent = '지난 검색 목록을 불러오지 못했습니다: ' + e.message; return; }
+    paint();
+  }
+  // 검색 단계를 처음 열 때, 메모리에 열린 검색이 없는데 지난 검색이 있으면 목록을 펼쳐서 보여 준다
+  async function onOpenStage() {
+    await load();
+    if (shownFirst) return;
+    shownFirst = true;
+    try {
+      const s = await get('/api/search/status');
+      if (!s.running && !s.count && runs.length) H('search-history').open = true;
+    } catch (e) { /* 상태를 못 읽으면 펼치지 않는다 */ }
+  }
+  H('search-open').addEventListener('click', onOpenStage);
+  H('search-history').addEventListener('toggle', () => { if (H('search-history').open) load(); });
+  H('search-history-list').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button[data-run]');
+    if (!b || busy || running) return;
+    busy = true; paint();
+    H('search-history-msg').textContent = '여는 중…';
+    try {
+      const done = await post('/api/search/runs/open', {run_id: b.dataset.run});
+      openedId = done.run_id;
+      H('search-history-msg').textContent = '지난 검색을 열었습니다. 아래에서 수집 URL·보고서·제출 반영 내용을 확인하십시오.';
+    } catch (e) { H('search-history-msg').textContent = e.message; }
+    finally { busy = false; paint(); }
+  });
+  // 검색이 끝나면(진행 중 → 아님) 목록을 다시 읽는다. 진행 중에는 열기 버튼을 막는다.
+  async function watch() {
+    try {
+      const s = await get('/api/search/status');
+      if (running !== null && running !== s.running) {
+        running = s.running;
+        if (!running) { openedId = ''; await load(); }
+      }
+      if (running !== s.running) running = s.running;
+      if (H('search-history-list').querySelector('button[data-run]')?.disabled !== (busy || running)) paint();
+    } catch (e) { /* 다음 확인 때 다시 시도 */ }
+    setTimeout(watch, 2000);
+  }
+  watch();
+  load();
+})();
+</script>
+</body>
+</html>

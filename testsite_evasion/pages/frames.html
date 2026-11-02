@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>iframe 주소 사례</title>
+<style>
+body{margin:0;background:#fff;color:#222;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:15px;line-height:1.6}
+.top{background:#1a3c6e;color:#fff;padding:10px 20px;font-weight:bold}
+.wrap{max-width:900px;margin:20px auto;padding:0 16px}
+h2{border-bottom:2px solid #1a3c6e;padding-bottom:8px}
+.case{border:1px solid #d9e2ec;border-radius:4px;padding:10px 14px;margin:10px 0;position:relative}
+.case h3{margin:0 0 6px;font-size:13px;color:#64748b;font-weight:normal}
+.layer-before::before{content:'';position:absolute;inset:0;background:#fff}
+ul.menu{list-style:none;padding:0}
+ul.menu li{padding:6px 0;border-bottom:1px dashed #e2e8f0}
+</style>
+</head>
+<body>
+<div class="top">훤히시 열린행정</div>
+<div class="wrap">
+<h2>iframe 주소 사례</h2>
+<div class="case"><h3>상대 경로</h3><iframe src="frame?id=rel" title="알림 1"></iframe></div>
+<div class="case"><h3>../ 경로</h3><iframe src="../evasion/frame?id=dot" title="알림 2"></iframe></div>
+<div class="case"><h3>// 로 시작하는 주소</h3><iframe src="//127.0.0.1:8788/evasion/frame?id=proto" title="알림 3"></iframe></div>
+<div class="case"><h3>쿼리가 둘인 주소 (&amp;)</h3><iframe src="frame?id=amp&amp;lang=ko" title="알림 4"></iframe></div>
+<div class="case"><h3>다른 출처 (localhost)</h3><iframe src="http://localhost:8788/evasion/frame?id=xorigin" title="알림 5"></iframe></div>
+<div class="case"><h3>srcdoc</h3><iframe id="sd" title="알림 6" srcdoc="&lt;p&gt;내장 알림&lt;/p&gt;&lt;span class=&quot;fr-ad&quot; style=&quot;position:absolute;left:-9999px&quot;&gt;안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_fr-sd&lt;/span&gt;"></iframe></div>
+</div>
+</body>
+</html>

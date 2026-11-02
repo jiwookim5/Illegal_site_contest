@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>공지사항</title>
+<link rel="stylesheet" href="/css/e8.css"></head><body>
+<h2>공지사항</h2>
+<form id="listForm" action="/bbs/list.do" method="get"><input type="hidden" name="pageIndex" value="1"></form>
+<table class="board"><tbody>
+<tr><td>1001</td><td class="subject"><a href="javascript:fn_view('1001')">2026년 하반기 군정 소식지 발간</a></td>
+  <td><a href="javascript:fn_delete('1001')" class="del">삭제</a></td></tr>
+<tr onclick="location.href='/bbs/view.do?nttId=1002'" class="row"><td>1002</td><td class="subject">농업인 수당 신청 안내</td><td></td></tr>
+<tr><td>1003</td><td class="subject"><a href="#" onclick="fn_view('1003'); return false;">군민 체육대회 개최</a></td><td></td></tr>
+<tr><td>1006</td><td class="subject"><button type="button" class="go" onclick="location.href='/bbs/view.do?nttId=1006'">버스 노선 개편 안내</button></td><td></td></tr>
+<tr><td>1007</td><td class="subject"><a href="javascript:window.open('/bbs/view.do?nttId=1007','notice','width=600,height=500')">[팝업] 태풍 대비 안내</a></td><td></td></tr>
+</tbody></table>
+<ul class="cards"><li class="card" data-ntt="1004">[포토] 가을 축제 현장</li></ul>
+<div class="paging"><strong>1</strong> <a href="javascript:fn_link_page(2)">2</a></div>
+<script>
+function fn_view(id) { location.href = '/bbs/view.do?nttId=' + id; }
+function fn_link_page(n) { var f = document.getElementById('listForm'); f.pageIndex.value = n; f.submit(); }
+function fn_delete(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  fetch('/bbs/delete.do', { method: 'POST', body: 'nttId=' + id,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+}
+document.querySelectorAll('li.card[data-ntt]').forEach(function (li) {
+  li.addEventListener('click', function () { fn_view(li.dataset.ntt); });
+});
+</script>
+</body></html>

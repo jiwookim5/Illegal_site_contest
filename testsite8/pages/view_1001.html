@@ -1,0 +1,10 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>게시글 1001</title>
+<link rel="stylesheet" href="/css/e8.css"></head><body>
+<h2>게시글 1001</h2>
+<div class="view-cont"><p>본문 내용입니다.</p><p class="h1001" style="display:none">카지노 첫충 20% 가입코드 777</p></div>
+<a href="/bbs/list.do">목록</a>
+<div id="comments"></div>
+<script>
+fetch('/bbs/comments.do?nttId=1001').then(r => r.text()).then(h => { document.getElementById('comments').innerHTML = h; });
+</script>
+</body></html>

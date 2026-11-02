@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>3번 글</title>
+<link rel="stylesheet" href="/css/s13.css"></head><body>
+<div class="cont"><h2>3번 글</h2><p>댓글은 화면을 내리면 불러옵니다.</p>
+<div style="height:3000px"></div>
+<div id="cmts"></div><div id="sentinel"></div></div>
+<script>
+const io = new IntersectionObserver((es) => {
+  if (!es.some(e => e.isIntersecting)) return;
+  io.disconnect();
+  fetch('/site/cmt?id=3').then(r => r.text()).then(t => { document.getElementById('cmts').innerHTML = t; });
+});
+io.observe(document.getElementById('sentinel'));
+</script>
+</body></html>

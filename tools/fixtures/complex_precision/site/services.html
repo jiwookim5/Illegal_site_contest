@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>상담과 지원</title><link rel="stylesheet" href="/site.css"></head><body>
+<header><a href="/">누리시 시민정보 포털</a></header><main><h1>주민 지원 서비스</h1>
+<section><h2>도박 문제 예방과 회복</h2><p id="n-counsel-visible">카지노 이용으로 생활이 어려운 분에게 무료 상담을 제공합니다.</p><p>주민 지원센터의 심리상담 사업이며 사업자 모집이나 게임 이용 안내가 아닙니다.</p><p id="n-counsel-mobile" class="mobile-only">카지노 이용으로 생활이 어려운 분에게 무료 상담을 제공합니다.</p></section>
+<section><h2>민원 유형별 안내</h2><div role="tablist"><button id="general-tab" role="tab" aria-selected="true" aria-controls="general-panel">일반 안내</button><button id="recovery-tab" role="tab" aria-selected="false" aria-controls="recovery-panel">상담 안내</button></div>
+<div id="general-panel" role="tabpanel" aria-labelledby="general-tab"><p>지원 프로그램은 소득에 관계없이 신청할 수 있습니다.</p></div>
+<div id="recovery-panel" role="tabpanel" aria-labelledby="recovery-tab" hidden><h3>도박 중독 회복 지원</h3><p id="n-tab-counsel">카지노 무료 상담 접수는 예약제로 운영합니다.</p><p>게임을 끊고 생활을 회복하도록 돕습니다.</p></div></section>
+<section><h2>불법 영상 유통 피해 지원</h2><p id="n-victim">성인영상 유포 피해자를 위한 무료 상담 신청 안내</p><p>피해 내용의 삭제 지원과 증거 보존 절차를 설명합니다.</p><details><summary>관련 문의</summary><p id="n-victim-hidden">성인방송 피해 상담은 무료이며, 개인정보를 공개하지 않습니다.</p></details></section>
+<section><h2>피해 예방 캠페인</h2><p id="n-split-warning"><strong>카지노</strong><span> 사기 </span><em>예방</em><span> 무료 상담</span></p></section>
+</main><script>
+for (const [id, active] of [['general-tab', false], ['recovery-tab', true]]) {
+  document.getElementById(id).onclick = () => {
+    document.getElementById('general-panel').hidden = active;
+    document.getElementById('recovery-panel').hidden = !active;
+    document.getElementById('general-tab').setAttribute('aria-selected', String(!active));
+    document.getElementById('recovery-tab').setAttribute('aria-selected', String(active));
+  };
+}
+</script></body></html>

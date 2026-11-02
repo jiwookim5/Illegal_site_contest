@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>지역 산업 통계</title><link rel="stylesheet" href="/site.css"></head><body>
+<header><a href="/">누리시 시민정보 포털</a></header><main><h1>지역 산업과 관광 통계</h1><p>자료의 숫자는 모두 시험을 위해 만든 값입니다.</p>
+<section><h2>산업 분류</h2><table><caption>분기별 사업장 현황</caption><thead><tr><th>분류</th><th>사업장 수</th><th>종사자 수</th></tr></thead><tbody>
+<tr><th id="n-table-industry">외국인 전용 카지노</th><td>2</td><td>240</td></tr>
+<tr><th>박물관</th><td>8</td><td>84</td></tr></tbody></table>
+<p id="n-chart-alt" class="sr-only">카지노 종사자는 전체 관광업 종사자 중 3퍼센트입니다.</p>
+<p id="n-print" class="print-only">카지노 산업 현황과 공공 통계 이용 안내</p>
+<p id="n-data-link">카지노 통계 무료 열람 및 원자료 다운로드 안내</p></section>
+<section><h2>목록 탐색</h2><p>숫자와 표가 많은 페이지에서도 정상 문구가 유지되는지 확인합니다.</p><div class="scrollbox"><table><thead><tr><th>자료 번호</th><th>자료명</th><th>상태</th></tr></thead><tbody id="long-table"></tbody></table></div>
+<p id="n-after-table">슬롯별 민원 예약 현황: 시간대별 무료 상담 접수 건수</p></section>
+<section><h2>구형 시스템의 전각 표기</h2><p id="n-archive-wide">ＣＡＳＩＮＯ 산업분류 코드의 변경 이력을 보관합니다.</p></section>
+</main><script>
+const rows = document.getElementById('long-table');
+for (let i = 1; i <= 180; i++) {
+  const tr = document.createElement('tr');
+  for (const value of [String(i), `주민 생활 통계 ${i}호`, '공개']) {
+    const td = document.createElement('td'); td.textContent = value; tr.append(td);
+  }
+  rows.append(tr);
+}
+</script></body></html>

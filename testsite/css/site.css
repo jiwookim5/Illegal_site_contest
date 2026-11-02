@@ -1,0 +1,16 @@
+body{font-family:sans-serif;margin:0;padding:0;color:#222}
+.wrap{max-width:900px;margin:0 auto;padding:20px}
+table.board-list{width:100%;border-collapse:collapse}
+table.board-list th,table.board-list td{border-bottom:1px solid #ddd;padding:8px}
+
+/* ---- 접근성용 정상 은닉 (함정) ---- */
+.sr-only{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.visually-hidden{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+
+/* ---- 불법광고 은닉용 클래스 ---- */
+.ghost-text{color:transparent}
+.bg-match{color:#ffffff;background-color:#ffffff}
+.zero-op{opacity:0}
+.tiny-font{font-size:0px}
+.off-left{position:absolute;left:-9999px}
+.none-disp{display:none}

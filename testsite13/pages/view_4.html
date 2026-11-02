@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>4번 글</title>
+<link rel="stylesheet" href="/css/s13.css"></head><body>
+<div class="cont"><h2>4번 글</h2><p>본문입니다.</p>
+<ul class="cmt-list" id="cl"><li class="cmt">첫 댓글입니다.</li></ul>
+<button type="button" class="more" id="more">댓글 더보기</button></div>
+<script>
+document.getElementById('more').addEventListener('click', () => {
+  fetch('/site/cmt?id=4').then(r => r.text()).then(t => {
+    document.getElementById('cl').insertAdjacentHTML('beforeend', t);
+    document.getElementById('more').remove();
+  });
+});
+</script>
+</body></html>

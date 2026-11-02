@@ -1,0 +1,27 @@
+body{font-family:sans-serif;margin:24px;background:#fff;color:#222}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* 1번 글: 숨김 */
+.cp-circle{clip-path:circle(0)}
+.cp-poly{clip-path:polygon(0 0,0 0,0 0)}
+.cp-inset{clip-path:inset(50%)}
+.f-opacity{filter:opacity(0)}
+.fill-clear{-webkit-text-fill-color:transparent}
+.zero-box{height:0;overflow:hidden}
+.max-zero{max-height:0;overflow:hidden}
+.left-999{position:absolute;left:-999px}
+.right-far{position:absolute;left:9999px;top:0}
+.tiny-scale{transform:scale(0.05);transform-origin:0 0}
+.clip-1px{position:absolute;clip:rect(1px,1px,1px,1px)}
+.indent-box{width:300px;overflow:hidden}
+.indent-box p{text-indent:-400px;white-space:nowrap}
+.shift-wrap{position:relative;height:40px;overflow:hidden}
+.shift-out{position:relative;top:-300px}
+/* 2번 글: 보이는 함정 */
+.vis-parent{visibility:hidden}
+.vis-child{visibility:visible}
+.cp-half{clip-path:inset(0 0 0 0)}
+.scale-one{transform:scale(1)}
+.clip-parent{overflow:hidden;height:60px}
+.indent-small{text-indent:-10px;padding-left:10px}
+.dim{color:#888}
+html{overflow-x:hidden}

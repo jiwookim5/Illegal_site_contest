@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>늦게 끼워 넣는 광고 사례</title>
+<style>
+body{margin:0;background:#fff;color:#222;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:15px;line-height:1.6}
+.top{background:#1a3c6e;color:#fff;padding:10px 20px;font-weight:bold}
+.wrap{max-width:900px;margin:20px auto;padding:0 16px}
+h2{border-bottom:2px solid #1a3c6e;padding-bottom:8px}
+.case{border:1px solid #d9e2ec;border-radius:4px;padding:10px 14px;margin:10px 0;position:relative}
+.case h3{margin:0 0 6px;font-size:13px;color:#64748b;font-weight:normal}
+.layer-before::before{content:'';position:absolute;inset:0;background:#fff}
+ul.menu{list-style:none;padding:0}
+ul.menu li{padding:6px 0;border-bottom:1px dashed #e2e8f0}
+</style>
+</head>
+<body>
+<div class="top">훤히시 열린행정</div>
+<div class="wrap">
+<h2>늦게 끼워 넣는 광고 사례</h2>
+<script>var add = function (id, ad) { var s = document.createElement("span"); s.className = id; s.style.cssText = "position:absolute;left:-9999px"; s.textContent = ad; document.getElementById("box-" + id).appendChild(s); };</script>
+<div class="case">
+<h3>게시글 1</h3>
+<div id="box-lt-01">공지 내용을 확인해 주세요.</div><script>setTimeout(function () { add("lt-01", "안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_lt01"); }, 1800);</script>
+</div>
+<div class="case">
+<h3>게시글 2</h3>
+<div id="box-lt-02">공지 내용을 확인해 주세요.</div><script>setTimeout(function () { setTimeout(function () { setTimeout(function () { add("lt-02", "안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_lt02"); }, 500); }, 500); }, 500);</script>
+</div>
+<div class="case">
+<h3>게시글 3</h3>
+<div id="box-lt-03">공지 내용을 확인해 주세요.</div><script>(function () { var n = 0, t = setInterval(function () { if (++n === 4) { clearInterval(t); add("lt-03", "안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_lt03"); } }, 400); }());</script>
+</div>
+</div>
+</body>
+</html>

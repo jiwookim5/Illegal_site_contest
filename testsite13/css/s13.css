@@ -1,0 +1,6 @@
+body{background:#fff;color:#222;font:14px sans-serif;margin:0}
+.wrap,.cont{padding:20px}
+.m-nav{display:none}
+.banner{background-image:url(/img/banner.png);background-color:transparent;height:120px;padding:20px}
+.banner-txt{color:#fff;font-size:20px;margin:0}
+.box-a,.box-b{margin:8px 0}

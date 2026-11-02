@@ -1,0 +1,13 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>자유게시판 목록</title></head><body>
+<h1>자유게시판</h1>
+<form id="listForm" name="listForm" method="post" action="/egov/list.do"><input type="hidden" name="pageIndex" value="1"><input type="hidden" name="bbsId" value="B1"></form>
+<table class="board">
+<tr><td class="title"><a href="/egov/view.do?bbsId=B1&amp;nttId=11">안내 11</a></td></tr>
+<tr><td class="title"><a href="/egov/view.do?nttId=11&amp;bbsId=B1">안내 11 (파라미터 순서만 다름)</a></td></tr>
+<tr><td class="title"><a href="/egov/view.do;jsessionid=A1B2C3D4?bbsId=B1&amp;nttId=11">안내 11 (세션 주소)</a></td></tr>
+<tr><td class="title"><a href="/egov/view.do?bbsId=B1&amp;nttId=11&amp;utm_source=mail">안내 11 (추적 파라미터)</a></td></tr>
+</table>
+<div class="paging"><strong>1</strong> <a href="#" onclick="fn_link_page(2);return false;">2</a></div>
+<iframe src="/egov/menu.do" title="바로가기 메뉴" width="300" height="80"></iframe>
+<script>function fn_link_page(n){document.listForm.pageIndex.value=n;document.listForm.submit();}</script>
+</body></html>

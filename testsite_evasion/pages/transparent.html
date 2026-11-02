@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>투명 텍스트 사례</title>
+<style>
+body{margin:0;background:#fff;color:#222;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:15px;line-height:1.6}
+.top{background:#1a3c6e;color:#fff;padding:10px 20px;font-weight:bold}
+.wrap{max-width:900px;margin:20px auto;padding:0 16px}
+h2{border-bottom:2px solid #1a3c6e;padding-bottom:8px}
+.case{border:1px solid #d9e2ec;border-radius:4px;padding:10px 14px;margin:10px 0;position:relative}
+.case h3{margin:0 0 6px;font-size:13px;color:#64748b;font-weight:normal}
+.layer-before::before{content:'';position:absolute;inset:0;background:#fff}
+ul.menu{list-style:none;padding:0}
+ul.menu li{padding:6px 0;border-bottom:1px dashed #e2e8f0}
+</style>
+</head>
+<body>
+<div class="top">훤히시 열린행정</div>
+<div class="wrap">
+<h2>투명 텍스트 사례</h2>
+<div class="case">
+<h3>게시글 1</h3>
+<p>공지 내용을 확인해 주세요. <span class="tr-00" style="color:transparent">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr00</span></p>
+</div>
+<div class="case">
+<h3>게시글 2</h3>
+<div style="position:relative;background:#000;height:32px"><div style="position:absolute;inset:0;background:#fff"></div><span class="tr-01" style="position:relative;color:#fff">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr01</span></div>
+</div>
+<div class="case">
+<h3>게시글 3</h3>
+<div class="layer-before" style="position:relative;background:#000;height:32px"><span class="tr-02" style="position:relative;color:#fff">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr02</span></div>
+</div>
+<div class="case">
+<h3>게시글 4</h3>
+<div style="background:#000;box-shadow:inset 0 0 0 999px #fff"><span class="tr-03" style="color:#fff">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr03</span></div>
+</div>
+<div class="case">
+<h3>게시글 5</h3>
+<svg class="tr-04" width="640" height="30"><text x="0" y="20" fill="#fff">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr04</text></svg>
+</div>
+<div class="case">
+<h3>게시글 6</h3>
+<span class="tr-05" style="display:inline-block;-webkit-mask-image:linear-gradient(transparent,transparent);mask-image:linear-gradient(transparent,transparent)">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr05</span>
+</div>
+<div class="case">
+<h3>게시글 7</h3>
+<div style="background:#fff"><span class="tr-06" style="color:#000;mix-blend-mode:screen">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr06</span></div>
+</div>
+<div class="case">
+<h3>게시글 8</h3>
+<div style="opacity:0.2"><span class="tr-07" style="opacity:0.1">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr07</span></div>
+</div>
+<div class="case">
+<h3>게시글 9</h3>
+<div style="opacity:0.1"><span class="tr-08" style="display:inline-block;filter:opacity(0.2)">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr08</span></div>
+</div>
+<div class="case">
+<h3>게시글 10</h3>
+<svg class="tr-09" width="640" height="30"><text x="0" y="20" fill="none">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr09</text></svg>
+</div>
+<div class="case">
+<h3>게시글 11</h3>
+<svg class="tr-10" width="640" height="30"><text x="0" y="20" fill-opacity="0">안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_tr10</text></svg>
+</div>
+</div>
+</body>
+</html>

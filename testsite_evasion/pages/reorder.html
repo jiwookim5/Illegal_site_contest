@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>화면과 소스가 다른 글 사례</title>
+<style>
+body{margin:0;background:#fff;color:#222;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:15px;line-height:1.6}
+.top{background:#1a3c6e;color:#fff;padding:10px 20px;font-weight:bold}
+.wrap{max-width:900px;margin:20px auto;padding:0 16px}
+h2{border-bottom:2px solid #1a3c6e;padding-bottom:8px}
+.case{border:1px solid #d9e2ec;border-radius:4px;padding:10px 14px;margin:10px 0;position:relative}
+.case h3{margin:0 0 6px;font-size:13px;color:#64748b;font-weight:normal}
+.layer-before::before{content:'';position:absolute;inset:0;background:#fff}
+ul.menu{list-style:none;padding:0}
+ul.menu li{padding:6px 0;border-bottom:1px dashed #e2e8f0}
+</style>
+<style>@font-face{font-family:HwonhiRemapTest;src:url(/files/remap.woff) format("woff")}</style>
+</head>
+<body>
+<div class="top">훤히시 열린행정</div>
+<div class="wrap">
+<h2>화면과 소스가 다른 글 사례</h2>
+<div class="case">
+<h3>게시글 1</h3>
+<span class="ro-01" style="unicode-bidi:bidi-override;direction:rtl">10or_ve@ 램그레텔 급지 %03 충첫 증검튀먹 터이놀전안</span>
+</div>
+<div class="case">
+<h3>게시글 2</h3>
+<span class="ro-02" style="display:inline-flex"><span style="order:34">2</span><span style="order:33">0</span><span style="order:32">o</span><span style="order:31">r</span><span style="order:30">_</span><span style="order:29">v</span><span style="order:28">e</span><span style="order:27">@</span><span style="order:26">&nbsp;</span><span style="order:25">램</span><span style="order:24">그</span><span style="order:23">레</span><span style="order:22">텔</span><span style="order:21">&nbsp;</span><span style="order:20">급</span><span style="order:19">지</span><span style="order:18">&nbsp;</span><span style="order:17">%</span><span style="order:16">0</span><span style="order:15">3</span><span style="order:14">&nbsp;</span><span style="order:13">충</span><span style="order:12">첫</span><span style="order:11">&nbsp;</span><span style="order:10">증</span><span style="order:9">검</span><span style="order:8">튀</span><span style="order:7">먹</span><span style="order:6">&nbsp;</span><span style="order:5">터</span><span style="order:4">이</span><span style="order:3">놀</span><span style="order:2">전</span><span style="order:1">안</span></span>
+</div>
+<div class="case">
+<h3>게시글 3</h3>
+<span class="ro-03" style="font-family:HwonhiRemapTest">abc de fg hijk</span> @ev_ro03
+</div>
+<div class="case">
+<h3>게시글 4</h3>
+<canvas class="ro-04" width="640" height="30"></canvas><script>(function () { var c = document.currentScript.previousElementSibling.getContext("2d"); c.font = "16px sans-serif"; c.fillStyle = "#222"; c.fillText("안전놀이터 먹튀검증 첫충 30% 지급 텔레그램 @ev_ro04", 0, 20); }());</script>
+</div>
+</div>
+</body>
+</html>

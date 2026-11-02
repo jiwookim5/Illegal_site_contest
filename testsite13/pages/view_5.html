@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>5번 글</title>
+<link rel="stylesheet" href="/css/s13.css"></head><body>
+<div class="cont"><h2>5번 글</h2><p>댓글 목록을 POST 로 불러오는 전자정부 게시판 형태입니다.</p>
+<ul class="cmt-list" id="cl"><li class="cmt">첫 댓글입니다.</li></ul>
+<button type="button" class="more" id="more">댓글 더보기</button>
+<button type="button" class="more2" id="trap">답글 더보기</button></div>
+<script>
+const post = (url, body) => fetch(url, { method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+document.getElementById('more').addEventListener('click', () => {
+  post('/site/selectCmtList.do', 'nttId=5&pageIndex=2').then(r => r.text()).then(t => {
+    document.getElementById('cl').insertAdjacentHTML('beforeend', t);
+    document.getElementById('more').remove();
+  });
+});
+// 함정: 글자는 '더보기'지만 실제로는 댓글 삭제 요청을 보낸다. 서버에 닿으면 안 된다.
+document.getElementById('trap').addEventListener('click', () => { post('/site/deleteCmt.do', 'cmtId=1'); });
+</script>
+</body></html>

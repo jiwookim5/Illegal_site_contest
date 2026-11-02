@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>주민 참여 예산 공모</title>
+<link rel="stylesheet" href="/css/b5.css"></head><body>
+<h2>2027년 주민 참여 예산 사업 공모</h2>
+<div class="content"><p>주민 참여 예산 사업을 공모합니다. 붙임 서류를 내려받아 작성해 주십시오.</p></div>
+<!-- 전자정부 표준프레임워크처럼 첨부를 자바스크립트로 내려받는다 (<a href> 에 파일 주소가 없음) -->
+<ul class="file-list">
+<li><a href="javascript:fn_egov_downFile('F201','0')">공모_안내.hwpx</a></li>
+<li><span class="btn-down" onclick="fileDown('F202')">신청서 내려받기</span></li>
+<li><a href="#" class="down" onclick="fn_download('F203'); return false;">사업계획서_양식.hwp</a></li>
+<li><a href="javascript:fn_egov_downFile('F002','0')">개인정보_동의서.hwp</a></li>
+<li><a href="javascript:fn_egov_deleteFile('F201')" class="file-del">삭제</a></li>
+</ul>
+<form id="downForm" method="post" action="/cmm/fms/FileDown.do"><input type="hidden" name="atchFileId" value=""></form>
+<script>
+function fn_egov_downFile(id, sn) { window.open('/cmm/fms/FileDown.do?atchFileId=' + id + '&fileSn=' + sn); }
+function fileDown(id) { location.href = '/cmm/fms/FileDown.do?atchFileId=' + id; }
+function fn_download(id) { const f = document.getElementById('downForm'); f.atchFileId.value = id; f.submit(); }
+function fn_egov_deleteFile(id) { fetch('/cmm/fms/deleteFile.do?atchFileId=' + id, { method: 'POST' }); }
+</script>
+</body></html>

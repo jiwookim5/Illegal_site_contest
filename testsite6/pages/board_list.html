@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>공지사항 | 훤히시청</title>
+<link rel="stylesheet" href="/css/b6.css"></head><body>
+<header class="top">
+<a class="logo" href="/main">훤히시청</a>
+<form class="search-total" action="/search/total.do" method="get">
+<input type="search" name="kwd" title="통합검색어"><button type="submit">검색</button>
+</form>
+</header>
+<nav class="gnb"><a href="/board/list">공지사항</a> <a href="/news/list">보도자료</a> <a href="/lib/main">시립도서관</a> <a href="/guide/faq">자주 묻는 질문</a> <a href="/event/list">행사 안내</a> <a href="/mw/main">모바일 민원</a> <a href="/minwon/list">민원 사례</a></nav>
+<h2>공지사항</h2>
+<form class="board-search" action="/board/list" method="get">
+<select name="searchCnd"><option value="0">제목</option><option value="1">내용</option></select>
+<input type="text" name="searchWrd"><button type="submit">조회</button>
+</form>
+<p class="search-msg">검색어: {{q}}</p>
+<ul class="board"><li>2026년 하반기 민원 처리 기준 안내</li><li>시청 주차장 공사 안내</li></ul>
+</body></html>
